@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stock Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Stock Tracker</h1>
+      <div id="account" hidden>
+        <span id="user-email"></span>
+        <button id="sign-out" type="button" class="secondary">Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <p id="status" role="status" aria-live="polite"></p>
+
+      <section id="signed-out" hidden>
+        <p>Sign in to manage your watchlist.</p>
+        <button id="sign-in" type="button">Sign in</button>
+      </section>
+
+      <div id="app" hidden>
+        <section>
+          <h2>Upload watchlist</h2>
+          <p class="hint">
+            Semicolon-separated CSV with the columns <code>nazione</code>, <code>Nome</code>,
+            <code>prezzo Target Long</code> and <code>note</code>. An optional <code>ticker</code> column overrides the
+            automatic lookup. Rows without a long target price or with a note are skipped.
+          </p>
+          <label class="file">
+            <span>Choose CSV file</span>
+            <input id="file" type="file" accept=".csv,text/csv" />
+          </label>
+        </section>
+
+        <section id="preview" hidden>
+          <h2>Review before saving</h2>
+          <p id="preview-summary"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Line</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Country</th>
+                  <th scope="col" class="num">Target</th>
+                  <th scope="col">Ticker</th>
+                  <th scope="col">Lookup</th>
+                </tr>
+              </thead>
+              <tbody id="preview-rows"></tbody>
+            </table>
+          </div>
+          <details id="excluded" hidden>
+            <summary></summary>
+            <ul id="excluded-rows"></ul>
+          </details>
+          <div class="actions">
+            <button id="save" type="button">Save watchlist</button>
+            <button id="cancel" type="button" class="secondary">Cancel</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Current watchlist</h2>
+          <p id="watchlist-empty" hidden>No stocks yet. Upload a CSV to start.</p>
+          <div class="table-wrap">
+            <table id="watchlist-table" hidden>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Ticker</th>
+                  <th scope="col" class="num">Target</th>
+                  <th scope="col">First flagged</th>
+                </tr>
+              </thead>
+              <tbody id="watchlist-rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

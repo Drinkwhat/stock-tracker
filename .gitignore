@@ -9,3 +9,6 @@ cdk.out/
 # Local working documents
 *.pdf
 *.csv
+
+# Generated at deploy time; create locally for development
+frontend/config.json
