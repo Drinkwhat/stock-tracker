@@ -1,7 +1,7 @@
 {
   "name": "stock-tracker",
   "scripts": {
-    "test": "node --import tsx --test",
+    "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "cdk": "cdk"
   },
