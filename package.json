@@ -11,6 +11,9 @@
     "constructs": "^10.8.1"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1141.0",
+    "@aws-sdk/lib-dynamodb": "^3.1141.0",
+    "@types/aws-lambda": "^8.10.163",
     "@types/node": "^26.6.3",
     "aws-cdk": "^2.1143.0",
     "esbuild": "^0.28.2",
@@ -19,5 +22,6 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "type": "module"
 }
