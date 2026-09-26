@@ -36,7 +36,8 @@ export interface Report {
 export const distanceOf = (price: number, target: number) => (price - target) / target;
 
 export function bandFor(price: number, target: number): Band {
-  const distance = Math.abs(distanceOf(price, target));
+  // Round away float noise: (5.15 - 5) / 5 is 0.030000000000000072, which must count as 3%.
+  const distance = Math.round(Math.abs(distanceOf(price, target)) * 1e9) / 1e9;
   if (distance <= NARROW_BAND) return "narrow";
   if (distance <= WIDE_BAND) return "wide";
   return "none";

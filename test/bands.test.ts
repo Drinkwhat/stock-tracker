@@ -20,6 +20,13 @@ test("bands are symmetric around the target and inclusive at the edges", () => {
   assert.equal(bandFor(105.1, 100), "none");
 });
 
+test("band edges are not shifted by floating point noise", () => {
+  assert.equal(bandFor(5.15, 5), "narrow");
+  assert.equal(bandFor(4.85, 5), "narrow");
+  assert.equal(bandFor(5.25, 5), "wide");
+  assert.equal(bandFor(76.1 * 1.05, 76.1), "wide");
+});
+
 test("morning run reports the wide band and sets the first flagged date", () => {
   const { report, updates } = evaluate([item()], prices(104), "morning", "2026-09-28");
   assert.equal(report.inBand.length, 1);

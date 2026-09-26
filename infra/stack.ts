@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, Stack, TimeZone, type StackProps } from "aws-cdk-lib";
 import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpUserPoolAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
@@ -11,8 +11,12 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as scheduler from "aws-cdk-lib/aws-scheduler";
+import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
+import * as ses from "aws-cdk-lib/aws-ses";
 import type { Construct } from "constructs";
 import * as path from "node:path";
+import type { RunKind } from "../backend/bands.ts";
 
 const LOCAL_DEV_ORIGIN = "http://localhost:5173";
 const FRONTEND_DIR = path.join(import.meta.dirname, "../frontend");
@@ -187,6 +191,36 @@ export class StockTrackerStack extends Stack {
       integration: new HttpLambdaIntegration("PreviewIntegration", previewFn),
       authorizer,
     });
+
+    // --- Scheduled alerts ---
+
+    const senderEmail: unknown = this.node.tryGetContext("senderEmail");
+    if (typeof senderEmail !== "string" || !senderEmail.includes("@")) {
+      throw new Error("Pass the alert sender address with: cdk deploy -c senderEmail=you@example.com");
+    }
+    const senderIdentity = new ses.EmailIdentity(this, "SenderIdentity", {
+      identity: ses.Identity.email(senderEmail),
+    });
+
+    const alertsFn = fn("AlertsFn", "alerts.ts", Duration.seconds(60));
+    alertsFn.addEnvironment("SENDER_EMAIL", senderEmail);
+    alertsFn.addEnvironment("USER_POOL_ID", userPool.userPoolId);
+    // A retry would email users who were already notified in the failed run.
+    alertsFn.configureAsyncInvoke({ retryAttempts: 0 });
+    table.grantReadWriteData(alertsFn);
+    userPool.grant(alertsFn, "cognito-idp:ListUsers");
+    senderIdentity.grantSendEmail(alertsFn);
+
+    const schedule = (id: string, cron: scheduler.CronOptionsWithTimezone, kind: RunKind) =>
+      new scheduler.Schedule(this, id, {
+        schedule: scheduler.ScheduleExpression.cron({ ...cron, weekDay: "MON-FRI", timeZone: TimeZone.EUROPE_ROME }),
+        target: new LambdaInvoke(alertsFn, {
+          input: scheduler.ScheduleTargetInput.fromObject({ kind }),
+          retryAttempts: 0,
+        }),
+      });
+    schedule("MorningAlerts", { hour: "10", minute: "0" }, "morning");
+    schedule("IntradayAlerts", { hour: "16,18", minute: "30" }, "intraday");
 
     new s3deploy.BucketDeployment(this, "DeploySite", {
       destinationBucket: siteBucket,

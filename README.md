@@ -9,17 +9,34 @@ scheduled job fetches current prices and emails each user the stocks that are wi
 Runs entirely on AWS serverless services (Cognito, API Gateway, Lambda, DynamoDB,
 EventBridge Scheduler, SES, S3 + CloudFront) and is deployed with the AWS CDK.
 
-> Status: work in progress. Watchlist upload and review work end to end; scheduled
-> price checks and email alerts are not implemented yet.
+## Alerts
+
+Prices are checked Monday to Friday (Europe/Rome time):
+
+| Time | Email contains |
+| --- | --- |
+| 10:00 | Stocks within ±5% of the target, stocks that left the ±5% band, and stocks that left the ±3% band while staying within ±5% since the previous morning |
+| 16:30, 18:30 | Stocks within ±3% of the target |
+
+- The distance is symmetric: `|price − target| / target`.
+- Each reported stock shows the date it was first reported. The date is kept while the
+  stock stays within ±5% and cleared when it leaves.
+- No email is sent when there is nothing to report.
+- Prices come from Yahoo Finance in the listing currency, so targets must use the same
+  currency.
 
 ## Architecture
 
 ```
-Browser ──► CloudFront ──► S3                 static site (frontend/)
+Browser ──► CloudFront ──► S3                          static site (frontend/)
                │
-               └─ /watchlist* ──► API Gateway ──► Lambda ──► DynamoDB
-                                   (Cognito JWT)     │
-                                                     └──► Yahoo Finance search
+               └─ /watchlist* ──► API Gateway ──► API Lambdas ──► DynamoDB
+                                  (Cognito JWT)        │
+                                                       └──► Yahoo Finance (ticker search)
+
+EventBridge Scheduler ──► Alerts Lambda ──► DynamoDB (watchlists, alert state)
+                                 ├────────► Yahoo Finance (prices)
+                                 └────────► SES ──► email to each user
 ```
 
 - `frontend/`: static page, no build step. Signs in with the Cognito hosted UI
@@ -28,6 +45,8 @@ Browser ──► CloudFront ──► S3                 static site (frontend/
   - `POST /watchlist/preview` parses the CSV and resolves tickers; it stores nothing.
   - `PUT /watchlist` validates the confirmed list and replaces the caller's watchlist.
   - `GET /watchlist` returns the caller's watchlist.
+  - `alerts.ts` runs on a schedule, fetches prices, updates alert state and emails
+    each user.
 - `infra/`: the CDK stack.
 
 The API is served from the site's own origin through CloudFront, so production needs
@@ -68,11 +87,24 @@ npm install
 | --- | --- |
 | `npm test` | Run unit tests |
 | `npm run typecheck` | Type-check the project |
-| `npx cdk diff` | Show infrastructure changes |
-| `npx cdk deploy` | Deploy the stack |
+| `npx cdk diff -c senderEmail=<address>` | Show infrastructure changes |
+| `npx cdk deploy -c senderEmail=<address>` | Deploy the stack |
 
 Use `AWS_PROFILE=<profile>` to pick the credentials used by CDK. After a deploy the
 site is available at the `SiteUrl` stack output.
+
+### Email sending
+
+`senderEmail` is the address alerts are sent from. The first deploy registers it with
+Amazon SES, which emails a verification link to that address.
+
+New SES accounts start in the sandbox, where every recipient must be verified too.
+Either verify each user's address
+(`aws sesv2 create-email-identity --email-identity user@example.com`) or request
+production access in the SES console.
+
+A sender on a domain you control, with DKIM configured, is the most reliable option.
+Mail sent through SES from a free webmail address may be filtered as spam.
 
 ### Local frontend development
 
