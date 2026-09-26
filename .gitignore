@@ -1,0 +1,11 @@
+node_modules/
+cdk.out/
+.cdk.staging/
+*.log
+.env
+.env.*
+.DS_Store
+
+# Local working documents
+*.pdf
+*.csv
