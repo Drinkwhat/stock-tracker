@@ -59,25 +59,34 @@ export class StockTrackerStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
-    const watchlistFn = new NodejsFunction(this, "WatchlistFn", {
-      entry: path.join(import.meta.dirname, "../backend/watchlist.ts"),
-      runtime: lambda.Runtime.NODEJS_22_X,
-      architecture: lambda.Architecture.ARM_64,
-      memorySize: 256,
-      timeout: Duration.seconds(10),
-      environment: { TABLE_NAME: table.tableName },
-      logGroup: new logs.LogGroup(this, "WatchlistFnLogs", {
-        retention: logs.RetentionDays.ONE_MONTH,
-        removalPolicy: RemovalPolicy.DESTROY,
-      }),
-    });
+    const fn = (id: string, file: string, timeout: Duration) =>
+      new NodejsFunction(this, id, {
+        entry: path.join(import.meta.dirname, "../backend", file),
+        runtime: lambda.Runtime.NODEJS_22_X,
+        architecture: lambda.Architecture.ARM_64,
+        memorySize: 256,
+        timeout,
+        environment: { TABLE_NAME: table.tableName },
+        logGroup: new logs.LogGroup(this, `${id}Logs`, {
+          retention: logs.RetentionDays.ONE_MONTH,
+          removalPolicy: RemovalPolicy.DESTROY,
+        }),
+      });
+
+    const watchlistFn = fn("WatchlistFn", "watchlist.ts", Duration.seconds(10));
     table.grantReadData(watchlistFn);
+
+    // Ticker searches run inside the request, bounded by the 30 s API Gateway timeout.
+    const previewFn = fn("PreviewFn", "preview.ts", Duration.seconds(28));
+
+    const saveFn = fn("SaveFn", "save.ts", Duration.seconds(28));
+    table.grantReadWriteData(saveFn);
 
     const api = new apigw.HttpApi(this, "Api", {
       createDefaultStage: false,
       corsPreflight: {
         allowOrigins: [LOCAL_DEV_ORIGIN],
-        allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.PUT],
+        allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PUT],
         allowHeaders: ["authorization", "content-type"],
         maxAge: Duration.hours(1),
       },
@@ -95,6 +104,18 @@ export class StockTrackerStack extends Stack {
       path: "/watchlist",
       methods: [apigw.HttpMethod.GET],
       integration: new HttpLambdaIntegration("WatchlistIntegration", watchlistFn),
+      authorizer,
+    });
+    api.addRoutes({
+      path: "/watchlist",
+      methods: [apigw.HttpMethod.PUT],
+      integration: new HttpLambdaIntegration("SaveIntegration", saveFn),
+      authorizer,
+    });
+    api.addRoutes({
+      path: "/watchlist/preview",
+      methods: [apigw.HttpMethod.POST],
+      integration: new HttpLambdaIntegration("PreviewIntegration", previewFn),
       authorizer,
     });
 

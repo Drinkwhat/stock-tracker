@@ -21,9 +21,10 @@ export interface ParseResult {
 
 export class CsvError extends Error {}
 
-export const MAX_ROWS = 1000;
-const MAX_NAME_LENGTH = 200;
-const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9.\-=^]{0,14}$/;
+// Every row may need a ticker search, which must finish within the 30 s API Gateway limit.
+export const MAX_ROWS = 200;
+export const MAX_NAME_LENGTH = 200;
+export const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9.\-=^]{0,14}$/;
 
 const COLUMNS = {
   name: "nome",
