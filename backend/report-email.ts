@@ -10,8 +10,8 @@ export interface Email {
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-function tickerHtml(ticker: string) {
-  const url = tradingViewUrl(ticker);
+function tickerHtml(ticker: string, exchange?: string) {
+  const url = tradingViewUrl(ticker, exchange);
   return url ? `<a href="${escapeHtml(url)}" style="color:#1f5fbf">${escapeHtml(ticker)}</a>` : escapeHtml(ticker);
 }
 
@@ -25,7 +25,8 @@ interface Section {
   withFlagDate: boolean;
 }
 
-export function renderEmail(report: Report, kind: RunKind, currencies: Map<string, string>, runLabel: string): Email {
+/** `exchanges` maps tickers to Yahoo exchange codes for the TradingView links; prices are in EUR. */
+export function renderEmail(report: Report, kind: RunKind, exchanges: Map<string, string>, runLabel: string): Email {
   const band = kind === "morning" ? WIDE_BAND : NARROW_BAND;
   const sections: Section[] = [
     { title: `Within ${pct(band)} of target`, lines: report.inBand, withFlagDate: true },
@@ -37,12 +38,12 @@ export function renderEmail(report: Report, kind: RunKind, currencies: Map<strin
     },
   ].filter((s) => s.lines.length > 0);
 
-  const price = (line: ReportLine, value: number) => `${money(value)} ${currencies.get(line.ticker) ?? ""}`.trim();
+
   const cells = (line: ReportLine, withFlagDate: boolean) => [
     line.name,
     line.ticker,
-    price(line, line.price),
-    price(line, line.targetPrice),
+    money(line.price),
+    money(line.targetPrice),
     signedPct(line.distance),
     ...(withFlagDate ? [line.firstFlaggedAt ?? ""] : []),
   ];
@@ -67,7 +68,7 @@ export function renderEmail(report: Report, kind: RunKind, currencies: Map<strin
       `<table style="border-collapse:collapse;font-size:14px">` +
       `<tr>${headers(s.withFlagDate).map((h) => `<th style="${cellStyle}">${h}</th>`).join("")}</tr>` +
       s.lines
-        .map((l) => `<tr>${cells(l, s.withFlagDate).map((c, i) => `<td style="${cellStyle}">${i === 1 ? tickerHtml(l.ticker) : escapeHtml(c)}</td>`).join("")}</tr>`)
+        .map((l) => `<tr>${cells(l, s.withFlagDate).map((c, i) => `<td style="${cellStyle}">${i === 1 ? tickerHtml(l.ticker, exchanges.get(l.ticker)) : escapeHtml(c)}</td>`).join("")}</tr>`)
         .join("") +
       `</table>`,
   );

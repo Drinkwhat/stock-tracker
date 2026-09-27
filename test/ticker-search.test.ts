@@ -75,6 +75,8 @@ test("maps Yahoo tickers to TradingView pages", () => {
   assert.equal(tradingViewUrl("ENEL.MI"), `${tv}MIL-ENEL/`);
   assert.equal(tradingViewUrl("ATE.PA"), `${tv}EURONEXT-ATE/`);
   assert.equal(tradingViewUrl("BT-A.L"), `${tv}LSE-BT.A/`);
-  assert.equal(tradingViewUrl("BRK-B"), `${tv}BRK.B/`);
+  assert.equal(tradingViewUrl("BRK-B", "NYQ"), `${tv}NYSE-BRK.B/`);
+  assert.equal(tradingViewUrl("AAPL", "NMS"), `${tv}NASDAQ-AAPL/`);
+  assert.equal(tradingViewUrl("HAL"), null, "US ticker without a known exchange gets no link");
   assert.equal(tradingViewUrl("7203.T"), null);
 });

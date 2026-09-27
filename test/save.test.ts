@@ -41,10 +41,10 @@ test("reports every invalid item, including duplicate tickers", () => {
   });
 });
 
-test("keeps alert state only when the target price is unchanged", () => {
+test("keeps alert state only when the target price is unchanged, and the exchange always", () => {
   const existing = [
     { userId: "u1", ticker: "CLX", name: "Clorox", targetPrice: 66.2, firstFlaggedAt: "2026-09-20" },
-    { userId: "u1", ticker: "KSS", name: "Kohl's", targetPrice: 13.4, firstFlaggedAt: "2026-09-21" },
+    { userId: "u1", ticker: "KSS", name: "Kohl's", targetPrice: 13.4, firstFlaggedAt: "2026-09-21", exchange: "NYQ" },
     { userId: "u1", ticker: "BAX", name: "Baxter", targetPrice: 16.3 },
   ];
   const { puts, deletes } = planReplace("u1", existing, [
@@ -54,7 +54,7 @@ test("keeps alert state only when the target price is unchanged", () => {
   ]);
   assert.deepEqual(puts, [
     { userId: "u1", ticker: "CLX", name: "Clorox Co", targetPrice: 66.2, firstFlaggedAt: "2026-09-20" },
-    { userId: "u1", ticker: "KSS", name: "Kohl's", targetPrice: 12 },
+    { userId: "u1", ticker: "KSS", name: "Kohl's", targetPrice: 12, exchange: "NYQ" },
     { userId: "u1", ticker: "ANIK", name: "Anika", targetPrice: 14 },
   ]);
   assert.deepEqual(deletes, ["BAX"]);

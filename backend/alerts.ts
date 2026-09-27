@@ -32,7 +32,7 @@ export async function handler(event: { kind?: string }) {
   const quotes = await fetchQuotes([...new Set(items.map((i) => i.ticker))]);
   if (items.length > 0 && quotes.size === 0) throw new Error("No prices could be fetched");
   const prices = new Map([...quotes].map(([ticker, q]) => [ticker, q.price]));
-  const currencies = new Map([...quotes].map(([ticker, q]) => [ticker, q.currency]));
+  const exchanges = new Map([...quotes].map(([ticker, q]) => [ticker, q.exchange ?? ""]));
 
   const byUser = Map.groupBy(items, (item) => item.userId);
   let failures = 0;
@@ -40,7 +40,7 @@ export async function handler(event: { kind?: string }) {
     try {
       const { report, updates } = evaluate(userItems, prices, kind, today);
       // Send before saving state so a failed email is retried on the next run.
-      if (!isEmpty(report)) await send(await emailOf(userId), renderEmail(report, kind, currencies, runLabel));
+      if (!isEmpty(report)) await send(await emailOf(userId), renderEmail(report, kind, exchanges, runLabel));
       for (const { item, state } of updates) await saveState(userId, item, state);
     } catch (err) {
       failures++;

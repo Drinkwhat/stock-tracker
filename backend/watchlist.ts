@@ -9,7 +9,7 @@ export async function handler(event: AuthedEvent) {
     name: item.name,
     targetPrice: item.targetPrice,
     firstFlaggedAt: item.firstFlaggedAt ?? null,
-    tradingViewUrl: tradingViewUrl(item.ticker),
+    tradingViewUrl: tradingViewUrl(item.ticker, item.exchange as string | undefined),
   }));
   return json(200, { watchlist });
 }

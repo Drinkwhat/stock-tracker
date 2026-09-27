@@ -1,5 +1,7 @@
+import { mapWithConcurrency } from "./concurrency.ts";
 import { batchWrite, queryUserItems, type StoredItem } from "./db.ts";
 import { bodyText, json, userIdOf, type AuthedEvent } from "./http.ts";
+import { fetchQuote } from "./prices.ts";
 import { MAX_NAME_LENGTH, MAX_ROWS, TICKER_PATTERN } from "./watchlist-csv.ts";
 
 export interface WatchlistItem {
@@ -48,7 +50,8 @@ export function planReplace(userId: string, existing: StoredItem[], incoming: Wa
   const puts: StoredItem[] = incoming.map((item) => {
     const prev = previous.get(item.ticker);
     const state = prev && prev.targetPrice === item.targetPrice ? prev : {};
-    return { ...state, userId, ticker: item.ticker, name: item.name, targetPrice: item.targetPrice };
+    const exchange = prev?.exchange === undefined ? {} : { exchange: prev.exchange };
+    return { ...state, ...exchange, userId, ticker: item.ticker, name: item.name, targetPrice: item.targetPrice };
   });
   const kept = new Set(incoming.map((item) => item.ticker));
   const deletes = existing.filter((item) => !kept.has(item.ticker)).map((item) => item.ticker);
@@ -69,10 +72,26 @@ export async function handler(event: AuthedEvent) {
   const userId = userIdOf(event);
   const { puts, deletes } = planReplace(userId, await queryUserItems(userId), validation.items);
 
+  await addUsExchanges(puts);
+
   // Not atomic; writing before deleting means a partial failure leaves a superset
   // that the next upload corrects. Use TransactWriteItems if lists stay under 100 items.
   await batchWrite(puts.map((Item) => ({ PutRequest: { Item } })));
   await batchWrite(deletes.map((ticker) => ({ DeleteRequest: { Key: { userId, ticker } } })));
 
   return json(200, { saved: puts.length, removed: deletes.length });
+}
+
+// US tickers carry no exchange suffix; store Yahoo's exchange code so TradingView links open the right listing.
+// A failed lookup only means no link, so it never blocks the save.
+async function addUsExchanges(puts: StoredItem[]) {
+  const missing = puts.filter((item) => !item.ticker.includes(".") && item.exchange === undefined);
+  await mapWithConcurrency(missing, 5, async (item) => {
+    try {
+      const { exchange } = await fetchQuote(item.ticker);
+      if (exchange) item.exchange = exchange;
+    } catch (err) {
+      console.error("Exchange lookup failed", { ticker: item.ticker, error: String(err) });
+    }
+  });
 }

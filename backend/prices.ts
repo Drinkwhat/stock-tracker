@@ -3,6 +3,8 @@ import { mapWithConcurrency } from "./concurrency.ts";
 export interface Quote {
   price: number;
   currency: string;
+  /** Yahoo exchange code, e.g. NYQ; needed to link US tickers to TradingView. */
+  exchange?: string;
 }
 
 const CONCURRENCY = 5;
@@ -15,13 +17,17 @@ export async function fetchQuote(ticker: string): Promise<Quote> {
   });
   if (!res.ok) throw new Error(`Yahoo chart request for ${ticker} failed with status ${res.status}`);
   const data = (await res.json()) as {
-    chart?: { result?: { meta?: { regularMarketPrice?: unknown; currency?: unknown } }[] };
+    chart?: { result?: { meta?: { regularMarketPrice?: unknown; currency?: unknown; exchangeName?: unknown } }[] };
   };
   const meta = data.chart?.result?.[0]?.meta;
   if (typeof meta?.regularMarketPrice !== "number" || !(meta.regularMarketPrice > 0)) {
     throw new Error(`No price for ${ticker}`);
   }
-  return { price: meta.regularMarketPrice, currency: typeof meta.currency === "string" ? meta.currency : "" };
+  return {
+    price: meta.regularMarketPrice,
+    currency: typeof meta.currency === "string" ? meta.currency : "",
+    exchange: typeof meta.exchangeName === "string" ? meta.exchangeName : undefined,
+  };
 }
 
 // Yahoo quotes some listings in minor units (London in pence, Johannesburg in cents).
@@ -57,7 +63,7 @@ export async function fetchQuotes(tickers: string[], fetchOne = fetchQuote): Pro
   for (const [ticker, q] of raw) {
     const [major, divisor] = majorOf(q.currency);
     const rate = rates.get(major);
-    if (rate !== undefined) quotes.set(ticker, { price: (q.price / divisor) * rate, currency: "EUR" });
+    if (rate !== undefined) quotes.set(ticker, { ...q, price: (q.price / divisor) * rate, currency: "EUR" });
   }
   return quotes;
 }
