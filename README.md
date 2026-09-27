@@ -2,9 +2,10 @@
 
 Email alerts when stocks on a watchlist approach their target price.
 
-A signed-in user uploads a CSV watchlist through a small web page. Three times a day a
-scheduled job fetches current prices and emails each user the stocks that are within
-±5% (10:00) or ±3% (16:30, 18:30) of their long target price.
+A signed-in user builds a watchlist on a small web page (from a CSV file, by hand, or
+straight from TradingView). Three times a day a scheduled job fetches current prices and
+emails each user the stocks that are within ±5% (10:00) or ±3% (16:30, 18:30) of their
+long target price.
 
 Runs entirely on AWS serverless services (Cognito, API Gateway, Lambda, DynamoDB,
 EventBridge Scheduler, SES, S3 + CloudFront) and is deployed with the AWS CDK.
@@ -22,9 +23,31 @@ Prices are checked Monday to Friday (Europe/Rome time):
 - Each reported stock shows the date it was first reported. The date is kept while the
   stock stays within ±5% and cleared when it leaves.
 - No email is sent when there is nothing to report.
+- Each ticker in the email links to its TradingView page.
 - Targets are in EUR. Prices come from Yahoo Finance in the listing currency and are
   converted to EUR at the current Yahoo FX rate before comparing; a stock whose FX rate
   cannot be fetched is reported as unpriced.
+
+## Web app
+
+- **Onboarding:** an empty watchlist offers a CSV import (reviewed before saving) or
+  manual entry. Once stocks exist, the list is edited in place.
+- **Editing:** name, ticker and target are edited inline; removals can be undone until
+  saved. A sticky bar counts unsaved changes and holds Save / Discard, and leaving the
+  page with unsaved changes asks for confirmation.
+- **Ticker lookup:** typing a new stock's name searches Yahoo; when several listings
+  match, a dropdown lists them with a TradingView chart link to check the right one.
+- **Search:** filters the list by name or ticker (`/` focuses it, `Esc` clears it);
+  saving always keeps the rows hidden by the filter.
+- **TradingView links:** US tickers carry no exchange suffix, so saving looks up and
+  stores Yahoo's exchange code (NYQ, NMS, …); without it TradingView may open a
+  namesake abroad (HAL → India's NSE). Stocks saved before this have no link until the
+  list is saved again.
+- **Bookmarklet:** "➕ Stock Tracker", dragged to the bookmarks bar, reads the stock on
+  the current TradingView page and opens the site with it pre-filled. On charts it reads
+  the tab title and the legend's exchange, because the chart URL does not follow symbol
+  changes.
+- Works on phones: each stock becomes a compact block below 640 px.
 
 ## Architecture
 
@@ -44,7 +67,8 @@ EventBridge Scheduler ──► Alerts Lambda ──► DynamoDB (watchlists, al
   (authorization code + PKCE) and keeps tokens in memory only.
 - `backend/`: Lambda handlers.
   - `POST /watchlist/preview` parses the CSV and resolves tickers; it stores nothing.
-  - `PUT /watchlist` validates the confirmed list and replaces the caller's watchlist.
+  - `PUT /watchlist` validates the confirmed list and replaces the caller's watchlist,
+    looking up the Yahoo exchange of new US tickers for their TradingView links.
   - `GET /watchlist` returns the caller's watchlist.
   - `GET /watchlist/search?q=` looks up tickers by name when a stock is added by hand;
     `?tv=NYSE:HAL` resolves a TradingView symbol for the "➕ Stock Tracker" bookmarklet, which
@@ -140,6 +164,12 @@ aws cognito-idp admin-create-user \
 ```
 
 The user receives a temporary password by email and sets a new one on first login.
+While SES is in the sandbox, also verify their address (see Email sending); the
+verification link expires after 24 hours.
+
+Remove a user with `aws cognito-idp admin-delete-user --user-pool-id <UserPoolId output>
+--username <username or sub>` and `aws sesv2 delete-email-identity --email-identity
+<address>`. Their watchlist rows in DynamoDB are not deleted automatically.
 
 ## License
 
