@@ -1,3 +1,5 @@
+import { fetchQuote, type Quote } from "./prices.ts";
+
 export interface YahooQuote {
   symbol?: string;
   quoteType?: string;
@@ -124,4 +126,42 @@ export function tradingViewUrl(ticker: string, yahooExchange?: string): string |
   // Yahoo writes share classes with a dash (BRK-B), TradingView with a dot (BRK.B).
   const tvSymbol = symbol.replaceAll("-", ".");
   return `https://www.tradingview.com/symbols/${encodeURIComponent(`${prefix}-${tvSymbol}`)}/`;
+}
+
+// TradingView exchange prefix → possible Yahoo suffixes. Euronext is one prefix for four markets.
+const YAHOO_SUFFIXES: Record<string, string[]> = {
+  NYSE: [""],
+  NASDAQ: [""],
+  AMEX: [""],
+  CBOE: [""],
+  MIL: [".MI"],
+  EURONEXT: [".PA", ".AS", ".BR", ".LS"],
+  LSE: [".L"],
+  XETR: [".DE"],
+  SIX: [".SW"],
+  BME: [".MC"],
+};
+
+/**
+ * Resolves a TradingView symbol such as "EURONEXT:ATE" to the Yahoo listing whose TradingView page is the
+ * same one. Yahoo's search misses short symbols (ATE, SAN), so each possible ticker is priced directly.
+ */
+export async function candidatesForTradingView(
+  tvSymbol: string,
+  fetchOne: (ticker: string) => Promise<Quote> = fetchQuote,
+): Promise<Candidate[]> {
+  const [, prefix, symbol] = tvSymbol.trim().toUpperCase().match(/^([A-Z]+):([A-Z0-9.]{1,12})$/) ?? [];
+  const suffixes = prefix ? YAHOO_SUFFIXES[prefix] : undefined;
+  if (!suffixes) return [];
+  // Share classes: TradingView BRK.B / BT.A, Yahoo BRK-B / BT-A.L.
+  const base = symbol.replaceAll(".", "-");
+  const wanted = `/symbols/${prefix}-${symbol}/`;
+  const quotes = await Promise.allSettled(suffixes.map((suffix) => fetchOne(base + suffix)));
+  return quotes.flatMap((result, i) => {
+    if (result.status !== "fulfilled") return [];
+    const ticker = base + suffixes[i];
+    const url = tradingViewUrl(ticker, result.value.exchange);
+    if (!url?.endsWith(wanted)) return [];
+    return [{ symbol: ticker, name: result.value.name ?? ticker, exchange: result.value.exchange ?? "", tradingViewUrl: url }];
+  });
 }

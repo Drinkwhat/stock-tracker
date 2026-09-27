@@ -5,6 +5,8 @@ export interface Quote {
   currency: string;
   /** Yahoo exchange code, e.g. NYQ; needed to link US tickers to TradingView. */
   exchange?: string;
+  /** Company name from Yahoo, when available. */
+  name?: string;
 }
 
 const CONCURRENCY = 5;
@@ -16,9 +18,14 @@ export async function fetchQuote(ticker: string): Promise<Quote> {
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Yahoo chart request for ${ticker} failed with status ${res.status}`);
-  const data = (await res.json()) as {
-    chart?: { result?: { meta?: { regularMarketPrice?: unknown; currency?: unknown; exchangeName?: unknown } }[] };
+  type Meta = {
+    regularMarketPrice?: unknown;
+    currency?: unknown;
+    exchangeName?: unknown;
+    longName?: unknown;
+    shortName?: unknown;
   };
+  const data = (await res.json()) as { chart?: { result?: { meta?: Meta }[] } };
   const meta = data.chart?.result?.[0]?.meta;
   if (typeof meta?.regularMarketPrice !== "number" || !(meta.regularMarketPrice > 0)) {
     throw new Error(`No price for ${ticker}`);
@@ -27,6 +34,7 @@ export async function fetchQuote(ticker: string): Promise<Quote> {
     price: meta.regularMarketPrice,
     currency: typeof meta.currency === "string" ? meta.currency : "",
     exchange: typeof meta.exchangeName === "string" ? meta.exchangeName : undefined,
+    name: [meta.longName, meta.shortName].find((n): n is string => typeof n === "string"),
   };
 }
 

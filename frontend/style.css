@@ -331,6 +331,21 @@ section {
   color: var(--muted);
 }
 
+.tip {
+  margin-top: calc(var(--space-3) * -1);
+}
+
+.bookmarklet {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border: 1px dashed var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: grab;
+}
+
 .count {
   margin-left: var(--space-1);
   font-size: 0.9375rem;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveTicker, searchCandidates, tradingViewUrl, type YahooQuote } from "../backend/ticker-search.ts";
+import { candidatesForTradingView, resolveTicker, searchCandidates, tradingViewUrl, type YahooQuote } from "../backend/ticker-search.ts";
 
 // Trimmed real responses from the Yahoo Finance search endpoint.
 const RESPONSES: Record<string, YahooQuote[]> = {
@@ -79,4 +79,22 @@ test("maps Yahoo tickers to TradingView pages", () => {
   assert.equal(tradingViewUrl("AAPL", "NMS"), `${tv}NASDAQ-AAPL/`);
   assert.equal(tradingViewUrl("HAL"), null, "US ticker without a known exchange gets no link");
   assert.equal(tradingViewUrl("7203.T"), null);
+});
+
+test("resolves TradingView symbols to the Yahoo listing with the same TradingView page", async () => {
+  const listed: Record<string, { exchange: string; name: string }> = {
+    "ATE.PA": { exchange: "PAR", name: "Alten S.A." },
+    HAL: { exchange: "NYQ", name: "Halliburton Company" },
+    "BRK-B": { exchange: "NYQ", name: "Berkshire Hathaway Inc." },
+  };
+  const fetchOne = async (ticker: string) => {
+    if (!listed[ticker]) throw new Error("not found");
+    return { price: 1, currency: "USD", ...listed[ticker] };
+  };
+  const symbols = async (tv: string) => (await candidatesForTradingView(tv, fetchOne)).map((c) => c.symbol);
+  assert.deepEqual(await symbols("EURONEXT:ATE"), ["ATE.PA"]);
+  assert.deepEqual(await symbols("NYSE:HAL"), ["HAL"]);
+  assert.deepEqual(await symbols("NYSE:BRK.B"), ["BRK-B"]);
+  assert.deepEqual(await symbols("NASDAQ:HAL"), [], "exchange must match");
+  assert.deepEqual(await symbols("TSE:7203"), [], "unsupported exchange");
 });

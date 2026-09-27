@@ -46,7 +46,9 @@ EventBridge Scheduler ──► Alerts Lambda ──► DynamoDB (watchlists, al
   - `POST /watchlist/preview` parses the CSV and resolves tickers; it stores nothing.
   - `PUT /watchlist` validates the confirmed list and replaces the caller's watchlist.
   - `GET /watchlist` returns the caller's watchlist.
-  - `GET /watchlist/search?q=` looks up tickers by name when a stock is added by hand.
+  - `GET /watchlist/search?q=` looks up tickers by name when a stock is added by hand;
+    `?tv=NYSE:HAL` resolves a TradingView symbol for the "➕ Stock Tracker" bookmarklet, which
+    opens the site with `?add=<symbol>` from any TradingView chart or symbol page.
   - `alerts.ts` runs on a schedule, fetches prices, updates alert state and emails
     each user.
 - `infra/`: the CDK stack.

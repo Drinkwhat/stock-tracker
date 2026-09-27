@@ -128,8 +128,7 @@ async function loadWatchlist() {
   return watchlist.length;
 }
 
-function watchlistRow(item) {
-  const isNew = !item;
+function watchlistRow(item, isNew = !item) {
   item ??= { name: "", ticker: "", targetPrice: "", firstFlaggedAt: null };
   const label = item.name || "new stock";
   const input = (name, ariaLabel, value, props = {}) => {
@@ -297,6 +296,56 @@ function addStock() {
   $("watchlist-rows").append(row);
   updateChanges();
   field(row, "name").focus();
+}
+
+// --- Add from TradingView (bookmarklet) ---
+
+// Reads the current TradingView symbol: symbol pages carry it in the path (/symbols/NYSE-HAL/); on charts the URL
+// goes stale when the symbol changes, so the ticker comes from the tab title ("HAL 21.5 ▲") and the exchange
+// from the legend's "NYSE — New York Stock Exchange" tooltip. Opens this site with ?add=NYSE:HAL.
+const bookmarklet = () =>
+  "javascript:(()=>{" +
+  "if(!location.hostname.endsWith('tradingview.com'))return alert('Open a stock on TradingView first.');" +
+  "const p=location.pathname.match(/\\/symbols\\/([A-Z]+)-([^/]+)/);" +
+  "const t=document.title.match(/^([A-Z0-9.]+)\\s/);" +
+  "const x=[...document.querySelectorAll('[title]')].map(e=>e.title).find(v=>/^[A-Z]+ \\u2014 /.test(v));" +
+  "const s=p?p[1]+':'+p[2]:t?(x?x.split(' ')[0]+':':'')+t[1]:'';" +
+  "if(!s)return alert('Open a stock on TradingView first.');" +
+  `open('${location.origin}/?add='+encodeURIComponent(s))` +
+  "})()";
+
+async function addFromTradingView(tvSymbol) {
+  const symbol = tvSymbol.split(":").pop();
+  $("upload").hidden = true;
+  setWatchlistStatus(`Looking up ${tvSymbol}…`);
+  const { candidates } = tvSymbol.includes(":")
+    ? await api(`watchlist/search?${new URLSearchParams({ tv: tvSymbol })}`)
+    : { candidates: [] };
+  const match = candidates[0];
+
+  const existing = [...$("watchlist-rows").rows].find((row) => match && field(row, "ticker").value === match.symbol);
+  if (existing) {
+    $("filter").value = match.symbol;
+    applyFilter();
+    field(existing, "targetPrice").focus();
+    return setWatchlistStatus(`${match.symbol} is already in your watchlist.`);
+  }
+
+  const row = watchlistRow({ name: match?.name ?? symbol, ticker: match?.symbol ?? "", targetPrice: "", firstFlaggedAt: null }, true);
+  $("watchlist-rows").append(row);
+  if (match) {
+    attachCandidates(field(row, "ticker"), candidates, row.querySelector(".chart"));
+    setWatchlistStatus(`Added ${match.symbol} (${match.name}). Enter the target and save.`);
+  } else {
+    await suggestTickers(symbol, field(row, "ticker"), row.querySelector(".chart"));
+    if (tvSymbol.includes(":")) {
+      const exchange = tvSymbol.split(":")[0];
+      setWatchlistStatus(`${exchange} isn't a supported exchange, so here are the closest matches for ${symbol}. Check the chart.`);
+    }
+  }
+  updateChanges();
+  row.scrollIntoView({ block: "center" });
+  field(row, "targetPrice").focus();
 }
 
 async function saveWatchlist() {
@@ -486,11 +535,23 @@ async function main() {
     if (file) previewFile(file).catch((err) => setStatus(err.message, true));
   });
 
+  $("bookmarklet").href = bookmarklet();
+  $("bookmarklet").addEventListener("click", (event) => {
+    event.preventDefault();
+    setWatchlistStatus("Drag this link to your bookmarks bar, then click it while viewing a stock on TradingView.");
+  });
+
   const params = new URLSearchParams(location.search);
+  // Survives the sign-in redirect, which drops the query string.
+  if (params.has("add")) sessionStorage.setItem("pendingAdd", params.get("add"));
   if (params.has("code")) await completeSignIn(params);
-  if (params.has("error")) setStatus("Sign-in was cancelled or failed.", true);
+  if (params.has("error")) {
+    sessionStorage.removeItem("pendingAdd");
+    setStatus("Sign-in was cancelled or failed.", true);
+  }
 
   if (!idToken) {
+    if (sessionStorage.getItem("pendingAdd")) return signIn();
     $("signed-out").hidden = false;
     return;
   }
@@ -499,6 +560,10 @@ async function main() {
   $("account").hidden = false;
   $("app").hidden = false;
   await loadWatchlist();
+
+  const pendingAdd = sessionStorage.getItem("pendingAdd");
+  sessionStorage.removeItem("pendingAdd");
+  if (pendingAdd) await addFromTradingView(pendingAdd).catch((err) => setWatchlistStatus(err.message, true));
 }
 
 main().catch((err) => setStatus(err.message, true));
