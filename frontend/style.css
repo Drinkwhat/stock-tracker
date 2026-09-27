@@ -1,30 +1,59 @@
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
+  --surface: #f5f6f8;
   --fg: #1c1f24;
   --muted: #5d6470;
   --border: #d9dde3;
+  --border-strong: #b9bfc8;
   --accent: #1f5fbf;
+  --accent-hover: #194f9f;
   --accent-fg: #ffffff;
+  --accent-soft: #eaf1fc;
+  --new: #edf7f0;
   --attention: #fff6d6;
   --error: #b42318;
+  --error-soft: #fdecea;
+  --focus-ring: rgb(31 95 191 / 0.35);
+
+  --radius: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+  --z-sticky: 10;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #15171a;
+    --surface: #1c1f23;
     --fg: #e8eaed;
     --muted: #9aa1ab;
     --border: #33373d;
+    --border-strong: #4a4f57;
     --accent: #6ea2ff;
+    --accent-hover: #8fb7ff;
     --accent-fg: #0b1220;
+    --accent-soft: #1b2638;
+    --new: #16261c;
     --attention: #3a3113;
     --error: #ff8a80;
+    --error-soft: #3a1a18;
+    --focus-ring: rgb(110 162 255 / 0.4);
   }
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Components set their own display; hidden must still win. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -34,64 +63,184 @@ body {
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-header,
-main {
-  max-width: 960px;
+main,
+.topbar-inner {
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
 }
 
-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border);
+main {
+  padding-bottom: var(--space-8);
+}
+
+h1,
+h2 {
+  text-wrap: balance;
 }
 
 h1 {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
+  margin: 0;
 }
 
 h2 {
-  font-size: 1.1rem;
-  margin-top: 2rem;
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  font-size: 0.875em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+/* --- Top bar --- */
+
+.topbar {
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
 }
 
 #account {
   display: flex;
-  gap: 12px;
+  gap: var(--space-2);
   align-items: center;
   color: var(--muted);
+  font-size: 0.875rem;
+  min-width: 0;
 }
 
-.hint {
-  color: var(--muted);
+#user-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+/* --- Buttons --- */
 
 button,
-.file span {
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 38px;
   font: inherit;
-  padding: 8px 16px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  padding: 0 var(--space-4);
   border: 1px solid var(--accent);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: var(--accent-fg);
   cursor: pointer;
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out),
+    color 150ms var(--ease-out);
+}
+
+button:hover,
+.button:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 button.secondary {
   background: transparent;
   color: var(--accent);
+  border-color: var(--border-strong);
+}
+
+button.secondary:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+button.ghost {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+button.ghost:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+button:disabled,
+button:disabled:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+button:not(.secondary, .ghost, .icon-button):disabled {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  opacity: 0.45;
 }
 
 button:focus-visible,
-input:focus-visible,
+.file:focus-within,
+a:focus-visible,
 select:focus-visible,
-.file:focus-within span {
+summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.icon-button {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-button:hover {
+  background: var(--error-soft);
+  border-color: transparent;
+  color: var(--error);
+}
+
+tr.removed .icon-button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.file {
+  position: relative;
 }
 
 .file input {
@@ -101,60 +250,322 @@ select:focus-visible,
   height: 1px;
 }
 
-.file span {
-  display: inline-block;
+/* --- Layout blocks --- */
+
+#status {
+  margin: var(--space-4) 0 0;
 }
+
+#status:empty {
+  display: none;
+}
+
+.error {
+  color: var(--error);
+}
+
+section {
+  margin-top: var(--space-8);
+}
+
+.panel {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.intro {
+  max-width: 640px;
+}
+
+.intro p {
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--muted);
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.count {
+  margin-left: var(--space-1);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.hint {
+  max-width: 72ch;
+  margin: var(--space-2) 0 var(--space-4);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+details {
+  margin-top: var(--space-3);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+summary {
+  cursor: pointer;
+  width: fit-content;
+  border-radius: 4px;
+}
+
+details.format p {
+  margin: var(--space-2) 0 0;
+}
+
+/* --- Tables --- */
 
 .table-wrap {
   overflow-x: auto;
 }
 
-table {
+table.data {
   width: 100%;
   border-collapse: collapse;
-}
-
-th,
-td {
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  vertical-align: top;
-}
-
-th {
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.num {
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-tr.attention {
+.data th,
+.data td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.data th {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.data .num {
+  text-align: right;
+}
+
+.data td {
+  white-space: nowrap;
+}
+
+.data tr.attention {
   background: var(--attention);
 }
 
-td input {
+/* Editable cells read as text until hovered or focused. */
+.cell-input {
+  width: 100%;
   font: inherit;
-  width: 8em;
-  padding: 2px 6px;
+  padding: 5px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg);
+  transition:
+    border-color 150ms var(--ease-out),
+    background-color 150ms var(--ease-out);
+}
+
+.cell-input::placeholder {
+  color: var(--muted);
+}
+
+tr:hover .cell-input:not(:disabled),
+.cell-input:hover:not(:disabled) {
+  border-color: var(--border);
+}
+
+.cell-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.cell-input.edited {
+  background: var(--accent-soft);
+}
+
+.cell-input.invalid {
+  border-color: var(--error);
+  background: var(--error-soft);
+}
+
+/* In the import review the ticker is the thing to fill in, so it always looks like a field. */
+.data:not(.editable) .cell-input {
+  width: 9rem;
+  border-color: var(--border-strong);
+  background: var(--bg);
+}
+
+.ticker-input {
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.targetPrice-input {
+  text-align: right;
+}
+
+/* Touch screens have no hover, so editable cells always show their border. */
+@media (hover: none) {
+  .cell-input:not(:disabled) {
+    border-color: var(--border);
+  }
+}
+
+.editable td {
+  padding: 6px var(--space-1);
+  vertical-align: middle;
+}
+
+.editable .c-name {
+  width: 38%;
+}
+
+.editable .c-ticker {
+  width: 9.5rem;
+}
+
+.editable .c-chart {
+  width: 5rem;
+}
+
+.editable .c-target {
+  width: 8rem;
+}
+
+.editable .c-flag {
+  width: 8.5rem;
+}
+
+.editable .c-remove {
+  width: 42px;
+  text-align: right;
+}
+
+.editable tbody tr {
+  transition: background-color 150ms var(--ease-out);
+}
+
+.editable tr.new {
+  background: var(--new);
+}
+
+.editable tr.removed .cell-input {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.editable tr.removed .c-chart,
+.editable tr.removed .c-flag {
+  opacity: 0.4;
+}
+
+.chart-link {
+  font-size: 0.875rem;
+  padding: 0 var(--space-1);
+}
+
+.chart-link::after {
+  content: " ↗";
+}
+
+.flag {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+select.candidates {
+  display: block;
+  width: 100%;
+  max-width: 20rem;
+  margin-top: var(--space-1);
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 3px var(--space-1);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
-  text-transform: uppercase;
 }
 
-td input[data-field="name"] {
-  width: 16em;
-  text-transform: none;
+#watchlist-table:has(tbody:empty) {
+  display: none;
 }
 
-td input[data-field="targetPrice"] {
-  text-align: right;
+/* --- Save bar --- */
+
+.savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 -6px 16px -12px rgb(0 0 0 / 0.35);
+  animation: rise 200ms var(--ease-out);
+}
+
+.savebar-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+#changes {
+  font-weight: 600;
+}
+
+#watchlist-status {
+  color: var(--muted);
+}
+
+#watchlist-status.error {
+  color: var(--error);
+}
+
+.savebar-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .visually-hidden {
@@ -163,44 +574,112 @@ td input[data-field="targetPrice"] {
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-td select {
-  display: block;
-  font: inherit;
-  margin-top: 4px;
-  width: 16em;
-  padding: 2px 4px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--fg);
+/* --- Small screens: each stock becomes a compact block --- */
+
+@media (max-width: 640px) {
+  h2 {
+    font-size: 1.125rem;
+  }
+
+  .panel {
+    padding: var(--space-4);
+  }
+
+  .editable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .editable tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-areas:
+      "name name remove"
+      "ticker target target"
+      "chart flag flag";
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .editable td {
+    width: auto !important;
+    padding: 0;
+    border: 0;
+  }
+
+  .editable .c-name {
+    grid-area: name;
+  }
+
+  .editable .c-name .cell-input {
+    font-weight: 600;
+  }
+
+  .editable .c-ticker {
+    grid-area: ticker;
+  }
+
+  .editable .c-target {
+    grid-area: target;
+  }
+
+  .editable .c-chart {
+    grid-area: chart;
+    align-self: center;
+  }
+
+  .editable .c-flag {
+    grid-area: flag;
+    align-self: center;
+    text-align: right;
+  }
+
+  .editable .c-remove {
+    grid-area: remove;
+  }
+
+  .editable td:empty {
+    display: none;
+  }
+
+  .icon-button {
+    width: 44px;
+    min-height: 44px;
+  }
+
+  .cell-input {
+    min-height: 40px;
+  }
+
+  .savebar {
+    margin-inline: calc(var(--space-4) * -1);
+    border-radius: 0;
+    border-inline: 0;
+    border-bottom: 0;
+  }
+
+  .savebar-actions {
+    width: 100%;
+  }
+
+  .savebar-actions button {
+    flex: 1;
+    min-height: 44px;
+  }
 }
 
-td input.invalid {
-  border-color: var(--error);
-  outline: 1px solid var(--error);
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  margin: 16px 0;
-}
-
-#status:empty {
-  display: none;
-}
-
-#status.error {
-  color: var(--error);
-}
-
-details {
-  margin-top: 12px;
-  color: var(--muted);
-}
-
-a {
-  color: var(--accent);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

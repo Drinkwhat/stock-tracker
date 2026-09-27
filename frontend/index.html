@@ -8,49 +8,65 @@
     <script type="module" src="app.js"></script>
   </head>
   <body>
-    <header>
-      <h1>Stock Tracker</h1>
-      <div id="account" hidden>
-        <span id="user-email"></span>
-        <button id="sign-out" type="button" class="secondary">Sign out</button>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1>Stock Tracker</h1>
+        <div id="account" hidden>
+          <span id="user-email"></span>
+          <button id="sign-out" type="button" class="ghost">Sign out</button>
+        </div>
       </div>
     </header>
 
     <main>
       <p id="status" role="status" aria-live="polite"></p>
 
-      <section id="signed-out" hidden>
-        <p>Sign in to manage your watchlist.</p>
+      <section id="signed-out" class="panel intro" hidden>
+        <h2>Price alerts for your watchlist</h2>
+        <p>
+          Get an email when a stock comes within reach of your target price. Prices are checked every weekday at 10:00,
+          16:30 and 18:30 (Rome time) and compared in euro.
+        </p>
         <button id="sign-in" type="button">Sign in</button>
       </section>
 
       <div id="app" hidden>
-        <section id="upload" hidden>
-          <h2>Upload watchlist</h2>
-          <p class="hint">
-            Semicolon-separated CSV with the columns <code>nazione</code>, <code>Nome</code>,
-            <code>prezzo Target Long</code> and <code>note</code>. An optional <code>ticker</code> column overrides the
-            automatic lookup. Rows without a long target price or with a note are skipped.
-          </p>
-          <label class="file">
-            <span>Choose CSV file</span>
-            <input id="file" type="file" accept=".csv,text/csv" />
-          </label>
+        <section id="upload" class="panel intro" hidden>
+          <h2>Start your watchlist</h2>
+          <p>Import the stocks you follow from a CSV file, or add them one at a time.</p>
+          <div class="actions">
+            <label class="file button">
+              <span>Import CSV</span>
+              <input id="file" type="file" accept=".csv,text/csv" />
+            </label>
+            <button id="add-manually" type="button" class="secondary">Add stocks manually</button>
+          </div>
+          <details class="format">
+            <summary>CSV format</summary>
+            <p>
+              Semicolon-separated, UTF-8, with the columns <code>nazione</code>, <code>Nome</code>,
+              <code>prezzo Target Long</code> and <code>note</code>. Target prices are in euro; Italian decimals such as
+              <code>16,3</code> are fine. An optional <code>ticker</code> column skips the automatic lookup. Rows without a
+              long target price, or with a note, are skipped.
+            </p>
+          </details>
         </section>
 
         <section id="preview" hidden>
-          <h2>Review before saving</h2>
+          <div class="section-head">
+            <h2>Review before saving</h2>
+          </div>
           <p id="preview-summary"></p>
           <div class="table-wrap">
-            <table>
+            <table class="data">
               <thead>
                 <tr>
-                  <th scope="col">Line</th>
+                  <th scope="col" class="num">Line</th>
                   <th scope="col">Name</th>
                   <th scope="col">Country</th>
                   <th scope="col" class="num">Target (EUR)</th>
                   <th scope="col">Ticker</th>
-                  <th scope="col">TradingView</th>
+                  <th scope="col">Chart</th>
                   <th scope="col">Lookup</th>
                 </tr>
               </thead>
@@ -67,29 +83,38 @@
           </div>
         </section>
 
-        <section>
-          <h2>Current watchlist</h2>
-          <p id="watchlist-empty" hidden>No stocks yet. Upload a CSV or add them one by one.</p>
-          <p class="hint">Changing a target restarts its alert tracking.</p>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Ticker</th>
-                  <th scope="col">TradingView</th>
-                  <th scope="col" class="num">Target (EUR)</th>
-                  <th scope="col">First flagged</th>
-                  <th scope="col"><span class="visually-hidden">Remove</span></th>
-                </tr>
-              </thead>
-              <tbody id="watchlist-rows"></tbody>
-            </table>
-          </div>
-          <div class="actions">
+        <section id="watchlist" hidden>
+          <div class="section-head">
+            <h2>Watchlist <span id="watchlist-count" class="count"></span></h2>
             <button id="add-stock" type="button" class="secondary">Add stock</button>
-            <button id="save-watchlist" type="button">Save changes</button>
-            <button id="discard-watchlist" type="button" class="secondary">Discard changes</button>
+          </div>
+          <p class="hint">
+            You get an email when a stock's price in euro is within ±5% of its target (±3% in the afternoon checks).
+            Changing a target restarts its tracking.
+          </p>
+          <table id="watchlist-table" class="data editable">
+            <thead>
+              <tr>
+                <th scope="col" class="c-name">Name</th>
+                <th scope="col" class="c-ticker">Ticker</th>
+                <th scope="col" class="c-chart">Chart</th>
+                <th scope="col" class="c-target num">Target (EUR)</th>
+                <th scope="col" class="c-flag">In range since</th>
+                <th scope="col" class="c-remove"><span class="visually-hidden">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody id="watchlist-rows"></tbody>
+          </table>
+
+          <div id="savebar" class="savebar" hidden>
+            <p class="savebar-text">
+              <span id="changes"></span>
+              <span id="watchlist-status" role="status" aria-live="polite"></span>
+            </p>
+            <div class="savebar-actions">
+              <button id="discard-watchlist" type="button" class="secondary">Discard</button>
+              <button id="save-watchlist" type="button">Save changes</button>
+            </div>
           </div>
         </section>
       </div>

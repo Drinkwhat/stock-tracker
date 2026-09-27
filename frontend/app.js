@@ -13,9 +13,9 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
-function setStatus(message, isError = false) {
-  $("status").textContent = message;
-  $("status").classList.toggle("error", isError);
+function setStatus(message, isError = false, target = $("status")) {
+  target.textContent = message;
+  target.classList.toggle("error", isError);
 }
 
 // --- Authentication (authorization code + PKCE) ---
@@ -104,57 +104,133 @@ async function api(path, options = {}) {
 
 // --- Current watchlist ---
 
+const ICON_REMOVE =
+  '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>';
+const ICON_UNDO =
+  '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5L3.5 8.5 7 12M4 8.5h7.5a4.5 4.5 0 010 9H9" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const flaggedDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+const field = (row, name) => row.querySelector(`[data-field="${name}"]`);
+const setWatchlistStatus = (message, isError = false) => {
+  setStatus(message, isError, $("watchlist-status"));
+  updateChanges();
+};
+
 async function loadWatchlist() {
   const { watchlist } = await api("watchlist");
   watchlist.sort((a, b) => a.name.localeCompare(b.name));
-  $("watchlist-rows").replaceChildren(...watchlist.map(watchlistRow));
+  $("watchlist-rows").replaceChildren(...watchlist.map((item) => watchlistRow(item)));
+  $("watchlist-count").textContent = watchlist.length === 1 ? "1 stock" : `${watchlist.length} stocks`;
   // The CSV is for onboarding; afterwards the list is edited in place.
   $("upload").hidden = watchlist.length > 0;
-  $("watchlist-empty").hidden = watchlist.length > 0;
+  $("watchlist").hidden = watchlist.length === 0;
+  setWatchlistStatus("");
   return watchlist.length;
 }
 
-function watchlistRow(item = { name: "", ticker: "", targetPrice: "", firstFlaggedAt: null }) {
-  const input = (field, label, value) => {
-    const node = el("input", { type: "text", value: String(value), autocomplete: "off", spellcheck: false });
-    node.dataset.field = field;
-    node.setAttribute("aria-label", label);
+function watchlistRow(item) {
+  const isNew = !item;
+  item ??= { name: "", ticker: "", targetPrice: "", firstFlaggedAt: null };
+  const label = item.name || "new stock";
+  const input = (name, ariaLabel, value, props = {}) => {
+    const node = el("input", { type: "text", value: String(value), autocomplete: "off", spellcheck: false, ...props });
+    node.className = `cell-input ${name}-input`;
+    node.dataset.field = name;
+    node.dataset.saved = node.value;
+    node.setAttribute("aria-label", ariaLabel);
     return node;
   };
-  const target = input("targetPrice", "Target (EUR)", item.targetPrice);
-  target.inputMode = "decimal";
-  const remove = el("button", { type: "button", className: "secondary", textContent: "Remove" });
+
+  const remove = el("button", { type: "button", className: "icon-button", innerHTML: ICON_REMOVE });
+  remove.setAttribute("aria-label", `Remove ${label}`);
+  const flagged = item.firstFlaggedAt
+    ? el("span", {
+        className: "flag",
+        title: `In the ±5% range since ${item.firstFlaggedAt}`,
+        textContent: flaggedDate.format(new Date(`${item.firstFlaggedAt}T12:00`)),
+      })
+    : "";
+
   const row = el(
     "tr",
-    {},
-    el("td", {}, input("name", "Name", item.name)),
-    el("td", {}, input("ticker", "Ticker", item.ticker)),
-    el("td", { className: "chart" }, item.tradingViewUrl ? chartLink(item.tradingViewUrl) : ""),
-    el("td", { className: "num" }, target),
-    el("td", { textContent: item.firstFlaggedAt ?? "—" }),
-    el("td", {}, remove),
+    { className: isNew ? "new" : "" },
+    el("td", { className: "c-name" }, input("name", `Name of ${label}`, item.name, { placeholder: "Company name" })),
+    el("td", { className: "c-ticker" }, input("ticker", `Ticker of ${label}`, item.ticker, { placeholder: "Ticker", maxLength: 15 })),
+    el("td", { className: "c-chart chart" }, item.tradingViewUrl ? chartLink(item.tradingViewUrl, item.ticker) : ""),
+    el(
+      "td",
+      { className: "c-target num" },
+      input("targetPrice", `Target in EUR for ${label}`, item.targetPrice, { placeholder: "Target", inputMode: "decimal" }),
+    ),
+    el("td", { className: "c-flag" }, flagged),
+    el("td", { className: "c-remove" }, remove),
   );
-  remove.addEventListener("click", () => row.remove());
+  remove.addEventListener("click", () => toggleRemoved(row, remove, label));
   // New stocks: look up the ticker when the name is entered.
-  if (!item.ticker) {
-    row.querySelector('[data-field="name"]').addEventListener("change", (event) =>
-      suggestTickers(event.target.value, row.querySelector('[data-field="ticker"]'), row.querySelector(".chart")).catch((err) =>
-        setStatus(err.message, true),
+  if (isNew) {
+    field(row, "name").addEventListener("change", (event) =>
+      suggestTickers(event.target.value, field(row, "ticker"), row.querySelector(".chart")).catch((err) =>
+        setWatchlistStatus(err.message, true),
       ),
     );
   }
   return row;
 }
 
-const chartLink = (href) => el("a", { href, target: "_blank", rel: "noopener", textContent: "Chart" });
+function toggleRemoved(row, button, label) {
+  if (row.classList.contains("new")) {
+    row.remove();
+    updateChanges();
+    return;
+  }
+  const removed = row.classList.toggle("removed");
+  row.querySelectorAll("input, select").forEach((i) => (i.disabled = removed));
+  button.innerHTML = removed ? ICON_UNDO : ICON_REMOVE;
+  button.setAttribute("aria-label", removed ? `Keep ${label}` : `Remove ${label}`);
+  updateChanges();
+}
 
-// Shows the search matches in a dropdown next to the ticker input; the chart link follows the chosen
+function pendingChanges() {
+  let count = 0;
+  for (const row of $("watchlist-rows").rows) {
+    if (row.classList.contains("removed") || row.classList.contains("new")) {
+      count++;
+      continue;
+    }
+    let edited = false;
+    for (const input of row.querySelectorAll("input")) {
+      const changed = input.value.trim() !== input.dataset.saved;
+      input.classList.toggle("edited", changed);
+      edited ||= changed;
+    }
+    if (edited) count++;
+  }
+  return count;
+}
+
+function updateChanges() {
+  const count = pendingChanges();
+  $("changes").textContent = count === 0 ? "" : `${count} unsaved ${count === 1 ? "change" : "changes"}`;
+  $("save-watchlist").disabled = count === 0;
+  $("discard-watchlist").disabled = count === 0;
+  $("savebar").hidden = count === 0 && !$("watchlist-status").textContent;
+  $("watchlist").hidden = $("watchlist-rows").rows.length === 0 && !$("upload").hidden;
+}
+
+const chartLink = (href, ticker) => {
+  const link = el("a", { href, target: "_blank", rel: "noopener", className: "chart-link", textContent: "Chart" });
+  link.setAttribute("aria-label", `Open ${ticker} on TradingView (new tab)`);
+  return link;
+};
+
+// Shows the search matches in a dropdown under the ticker input; the chart link follows the chosen
 // ticker so it can be checked on TradingView before saving.
 function attachCandidates(input, candidates, chartCell) {
   input.parentElement.querySelector("select")?.remove();
   const showChart = () => {
-    const match = input.candidates.find((c) => c.symbol === input.value.trim().toUpperCase());
-    chartCell.replaceChildren(match?.tradingViewUrl ? chartLink(match.tradingViewUrl) : "");
+    const ticker = input.value.trim().toUpperCase();
+    const match = input.candidates.find((c) => c.symbol === ticker);
+    chartCell.replaceChildren(match?.tradingViewUrl ? chartLink(match.tradingViewUrl, ticker) : "");
   };
   if (!input.candidates) input.addEventListener("input", showChart);
   input.candidates = candidates;
@@ -162,7 +238,7 @@ function attachCandidates(input, candidates, chartCell) {
   if (candidates.length > 1) {
     const select = el(
       "select",
-      {},
+      { className: "candidates" },
       ...candidates.map((c) =>
         el("option", { value: c.symbol, textContent: `${c.symbol} · ${c.name} (${c.exchange})`, selected: c.symbol === input.value }),
       ),
@@ -170,7 +246,7 @@ function attachCandidates(input, candidates, chartCell) {
     select.setAttribute("aria-label", "Matching stocks");
     select.addEventListener("change", () => {
       input.value = select.value;
-      showChart();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     input.after(select);
   }
@@ -179,30 +255,34 @@ function attachCandidates(input, candidates, chartCell) {
 
 async function suggestTickers(name, tickerInput, chartCell) {
   if (!name.trim()) return;
-  setStatus(`Looking up ${name}…`);
-  const { candidates } = await api(`watchlist/search?${new URLSearchParams({ q: name.trim() })}`);
-  if (candidates.length === 0) {
-    attachCandidates(tickerInput, [], chartCell);
-    return setStatus(`No ticker found for ${name}, enter it by hand.`, true);
+  setWatchlistStatus(`Looking up ${name}…`);
+  tickerInput.setAttribute("aria-busy", "true");
+  try {
+    const { candidates } = await api(`watchlist/search?${new URLSearchParams({ q: name.trim() })}`);
+    if (!tickerInput.value.trim() && candidates.length > 0) tickerInput.value = candidates[0].symbol;
+    attachCandidates(tickerInput, candidates, chartCell);
+    tickerInput.dispatchEvent(new Event("input", { bubbles: true }));
+    if (candidates.length === 0) return setWatchlistStatus(`No ticker found for ${name}. Enter it by hand.`, true);
+    setWatchlistStatus(
+      candidates.length === 1
+        ? `Found ${candidates[0].symbol} on ${candidates[0].exchange}. Check the chart before saving.`
+        : `${candidates.length} matches for ${name}. Pick one and check the chart before saving.`,
+    );
+  } finally {
+    tickerInput.removeAttribute("aria-busy");
   }
-  if (!tickerInput.value.trim()) tickerInput.value = candidates[0].symbol;
-  attachCandidates(tickerInput, candidates, chartCell);
-  setStatus(
-    candidates.length === 1
-      ? `Found ${candidates[0].symbol} (${candidates[0].name}, ${candidates[0].exchange}). Check the chart before saving.`
-      : `${candidates.length} matches for ${name}: pick one and check the chart before saving.`,
-  );
 }
 
 function addStock() {
+  $("upload").hidden = true;
   const row = watchlistRow();
   $("watchlist-rows").append(row);
-  row.querySelector("input").focus();
+  updateChanges();
+  field(row, "name").focus();
 }
 
 async function saveWatchlist() {
-  const rows = [...$("watchlist-rows").rows];
-  const field = (row, name) => row.querySelector(`[data-field="${name}"]`);
+  const rows = [...$("watchlist-rows").rows].filter((row) => !row.classList.contains("removed"));
   rows.forEach((row) => row.querySelectorAll("input").forEach((i) => i.classList.remove("invalid")));
 
   const items = rows.map((row) => ({
@@ -211,8 +291,11 @@ async function saveWatchlist() {
     // Accept Italian decimals ("16,3"); anything unparseable is rejected by the server.
     targetPrice: Number(field(row, "targetPrice").value.trim().replace(",", ".")) || null,
   }));
-  if (items.length === 0 && !confirm("Remove all stocks from your watchlist?")) return;
+  if (items.length === 0 && !confirm("Remove every stock from your watchlist?")) return;
 
+  const button = $("save-watchlist");
+  button.disabled = true;
+  button.textContent = "Saving…";
   try {
     const { saved } = await api("watchlist", {
       method: "PUT",
@@ -220,11 +303,22 @@ async function saveWatchlist() {
       body: JSON.stringify({ items }),
     });
     await loadWatchlist();
-    setStatus(`Watchlist saved: ${saved} stocks.`);
+    const message = `Saved. Your watchlist has ${saved} ${saved === 1 ? "stock" : "stocks"}.`;
+    setWatchlistStatus(message);
+    setTimeout(() => $("watchlist-status").textContent === message && setWatchlistStatus(""), 4000);
   } catch (err) {
-    for (const detail of err.body?.details ?? []) field(rows[detail.index], detail.field)?.classList.add("invalid");
-    setStatus(err.body?.details ? "Some fields are invalid or duplicated (highlighted in red)." : err.message, true);
+    const details = err.body?.details ?? [];
+    for (const detail of details) field(rows[detail.index], detail.field)?.classList.add("invalid");
+    rows[details[0]?.index]?.querySelector(".invalid")?.focus();
+    setWatchlistStatus(details.length ? "Fix the fields marked in red. Tickers must be unique." : err.message, true);
+  } finally {
+    button.textContent = "Save changes";
+    updateChanges();
   }
+}
+
+async function discardChanges() {
+  await loadWatchlist();
 }
 
 const formatPrice = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 4 });
@@ -271,6 +365,7 @@ async function previewFile(file) {
   );
 
   $("preview").hidden = false;
+  $("upload").hidden = true;
   setStatus("");
 }
 
@@ -282,6 +377,7 @@ function previewRow(row, index) {
     autocomplete: "off",
     spellcheck: false,
   });
+  input.className = "cell-input ticker-input";
   input.setAttribute("aria-label", `Ticker for ${row.name}`);
   input.dataset.index = index;
 
@@ -342,12 +438,18 @@ async function main() {
   $("sign-out").addEventListener("click", signOut);
   $("cancel").addEventListener("click", () => {
     $("preview").hidden = true;
+    $("upload").hidden = false;
     $("file").value = "";
   });
   $("save").addEventListener("click", save);
   $("add-stock").addEventListener("click", addStock);
+  $("add-manually").addEventListener("click", addStock);
   $("save-watchlist").addEventListener("click", saveWatchlist);
-  $("discard-watchlist").addEventListener("click", () => loadWatchlist().then(() => setStatus("")));
+  $("discard-watchlist").addEventListener("click", () => discardChanges().catch((err) => setWatchlistStatus(err.message, true)));
+  $("watchlist-rows").addEventListener("input", updateChanges);
+  addEventListener("beforeunload", (event) => {
+    if (!$("app").hidden && pendingChanges() > 0) event.preventDefault();
+  });
   $("file").addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) previewFile(file).catch((err) => setStatus(err.message, true));
