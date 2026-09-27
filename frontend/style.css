@@ -88,6 +88,7 @@ button.secondary {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 .file:focus-within span {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -119,6 +120,7 @@ td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  vertical-align: top;
 }
 
 th {
@@ -163,6 +165,18 @@ td input[data-field="targetPrice"] {
   clip-path: inset(50%);
 }
 
+td select {
+  display: block;
+  font: inherit;
+  margin-top: 4px;
+  width: 16em;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
 td input.invalid {
   border-color: var(--error);
   outline: 1px solid var(--error);
@@ -185,4 +199,8 @@ td input.invalid {
 details {
   margin-top: 12px;
   color: var(--muted);
+}
+
+a {
+  color: var(--accent);
 }

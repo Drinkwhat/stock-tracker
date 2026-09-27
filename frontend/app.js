@@ -129,38 +129,68 @@ function watchlistRow(item = { name: "", ticker: "", targetPrice: "", firstFlagg
     {},
     el("td", {}, input("name", "Name", item.name)),
     el("td", {}, input("ticker", "Ticker", item.ticker)),
+    el("td", { className: "chart" }, item.tradingViewUrl ? chartLink(item.tradingViewUrl) : ""),
     el("td", { className: "num" }, target),
     el("td", { textContent: item.firstFlaggedAt ?? "—" }),
-    el("td", {}, item.tradingViewUrl ? el("a", { href: item.tradingViewUrl, target: "_blank", rel: "noopener", textContent: "Chart" }) : ""),
     el("td", {}, remove),
   );
   remove.addEventListener("click", () => row.remove());
   // New stocks: look up the ticker when the name is entered.
   if (!item.ticker) {
     row.querySelector('[data-field="name"]').addEventListener("change", (event) =>
-      suggestTickers(event.target.value, row.querySelector('[data-field="ticker"]')).catch((err) => setStatus(err.message, true)),
+      suggestTickers(event.target.value, row.querySelector('[data-field="ticker"]'), row.querySelector(".chart")).catch((err) =>
+        setStatus(err.message, true),
+      ),
     );
   }
   return row;
 }
 
-let datalistCount = 0;
+const chartLink = (href) => el("a", { href, target: "_blank", rel: "noopener", textContent: "Chart" });
 
-async function suggestTickers(name, tickerInput) {
+// Shows the search matches in a dropdown next to the ticker input; the chart link follows the chosen
+// ticker so it can be checked on TradingView before saving.
+function attachCandidates(input, candidates, chartCell) {
+  input.parentElement.querySelector("select")?.remove();
+  const showChart = () => {
+    const match = input.candidates.find((c) => c.symbol === input.value.trim().toUpperCase());
+    chartCell.replaceChildren(match?.tradingViewUrl ? chartLink(match.tradingViewUrl) : "");
+  };
+  if (!input.candidates) input.addEventListener("input", showChart);
+  input.candidates = candidates;
+
+  if (candidates.length > 1) {
+    const select = el(
+      "select",
+      {},
+      ...candidates.map((c) =>
+        el("option", { value: c.symbol, textContent: `${c.symbol} · ${c.name} (${c.exchange})`, selected: c.symbol === input.value }),
+      ),
+    );
+    select.setAttribute("aria-label", "Matching stocks");
+    select.addEventListener("change", () => {
+      input.value = select.value;
+      showChart();
+    });
+    input.after(select);
+  }
+  showChart();
+}
+
+async function suggestTickers(name, tickerInput, chartCell) {
   if (!name.trim()) return;
   setStatus(`Looking up ${name}…`);
   const { candidates } = await api(`watchlist/search?${new URLSearchParams({ q: name.trim() })}`);
-  tickerInput.nextElementSibling?.remove();
-  if (candidates.length === 0) return setStatus(`No ticker found for ${name}, enter it by hand.`, true);
-
-  const list = el("datalist", { id: `search-${datalistCount++}` }, ...candidates.map((c) => el("option", { value: c.symbol, label: `${c.name} (${c.exchange})` })));
-  tickerInput.after(list);
-  tickerInput.setAttribute("list", list.id);
+  if (candidates.length === 0) {
+    attachCandidates(tickerInput, [], chartCell);
+    return setStatus(`No ticker found for ${name}, enter it by hand.`, true);
+  }
   if (!tickerInput.value.trim()) tickerInput.value = candidates[0].symbol;
+  attachCandidates(tickerInput, candidates, chartCell);
   setStatus(
     candidates.length === 1
-      ? `Found ${candidates[0].symbol} (${candidates[0].name}, ${candidates[0].exchange}).`
-      : `${candidates.length} matches for ${name}: check the ticker (click the field to see them).`,
+      ? `Found ${candidates[0].symbol} (${candidates[0].name}, ${candidates[0].exchange}). Check the chart before saving.`
+      : `${candidates.length} matches for ${name}: pick one and check the chart before saving.`,
   );
 }
 
@@ -245,7 +275,6 @@ async function previewFile(file) {
 }
 
 function previewRow(row, index) {
-  const listId = `candidates-${index}`;
   const input = el("input", {
     type: "text",
     value: row.ticker ?? "",
@@ -257,12 +286,8 @@ function previewRow(row, index) {
   input.dataset.index = index;
 
   const cell = el("td", {}, input);
-  if (row.candidates.length > 1) {
-    input.setAttribute("list", listId);
-    cell.append(
-      el("datalist", { id: listId }, ...row.candidates.map((c) => el("option", { value: c.symbol, label: `${c.name} (${c.exchange})` }))),
-    );
-  }
+  const chartCell = el("td");
+  if (row.candidates.length > 0) attachCandidates(input, row.candidates, chartCell);
 
   const needsAttention = row.status !== "resolved" && row.status !== "manual";
   return el(
@@ -273,6 +298,7 @@ function previewRow(row, index) {
     el("td", { textContent: row.country }),
     el("td", { className: "num", textContent: formatPrice(row.targetPrice) }),
     cell,
+    chartCell,
     el("td", { textContent: LOOKUP_LABELS[row.status] }),
   );
 }

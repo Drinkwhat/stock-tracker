@@ -10,6 +10,7 @@ export interface Candidate {
   symbol: string;
   name: string;
   exchange: string;
+  tradingViewUrl?: string | null;
 }
 
 export type Resolution =
@@ -57,7 +58,12 @@ export async function searchCandidates(
 ): Promise<Candidate[]> {
   return (await search(query))
     .filter((q) => q.symbol && q.quoteType === "EQUITY" && exchanges.includes(q.exchange ?? ""))
-    .map((q) => ({ symbol: q.symbol!, name: q.longname ?? q.shortname ?? q.symbol!, exchange: q.exchange! }));
+    .map((q) => ({
+      symbol: q.symbol!,
+      name: q.longname ?? q.shortname ?? q.symbol!,
+      exchange: q.exchange!,
+      tradingViewUrl: tradingViewUrl(q.symbol!, q.exchange),
+    }));
 }
 
 export async function resolveTicker(name: string, country: string, search: SearchFn = yahooSearch): Promise<Resolution> {
