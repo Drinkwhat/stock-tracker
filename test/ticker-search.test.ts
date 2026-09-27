@@ -71,10 +71,10 @@ test("search keeps equities on any supported exchange", async () => {
 });
 
 test("maps Yahoo tickers to TradingView pages", () => {
-  const tv = "https://www.tradingview.com/symbols/";
-  assert.equal(tradingViewUrl("ENEL.MI"), `${tv}MIL-ENEL/`);
-  assert.equal(tradingViewUrl("ATE.PA"), `${tv}EURONEXT-ATE/`);
-  assert.equal(tradingViewUrl("BT-A.L"), `${tv}LSE-BT.A/`);
-  assert.equal(tradingViewUrl("BRK-B"), `${tv}BRK.B/`);
+  const tv = "https://www.tradingview.com/chart/YAFkKt0U/?symbol=";
+  assert.equal(tradingViewUrl("ENEL.MI"), `${tv}MIL%3AENEL`);
+  assert.equal(tradingViewUrl("ATE.PA"), `${tv}EURONEXT%3AATE`);
+  assert.equal(tradingViewUrl("BT-A.L"), `${tv}LSE%3ABT.A`);
+  assert.equal(tradingViewUrl("BRK-B"), `${tv}BRK.B`);
   assert.equal(tradingViewUrl("7203.T"), null);
 });
