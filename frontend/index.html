@@ -86,7 +86,19 @@
         <section id="watchlist" hidden>
           <div class="section-head">
             <h2>Watchlist <span id="watchlist-count" class="count"></span></h2>
-            <button id="add-stock" type="button" class="secondary">Add stock</button>
+            <div class="toolbar">
+              <input
+                id="filter"
+                type="search"
+                class="search"
+                placeholder="Search name or ticker"
+                aria-label="Search your stocks"
+                aria-keyshortcuts="/"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button id="add-stock" type="button" class="secondary">Add stock</button>
+            </div>
           </div>
           <p class="hint">
             You get an email when a stock's price in euro is within ±5% of its target (±3% in the afternoon checks).
@@ -105,6 +117,7 @@
             </thead>
             <tbody id="watchlist-rows"></tbody>
           </table>
+          <p id="no-match" class="no-match" hidden></p>
 
           <div id="savebar" class="savebar" hidden>
             <p class="savebar-text">

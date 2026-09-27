@@ -120,7 +120,7 @@ async function loadWatchlist() {
   const { watchlist } = await api("watchlist");
   watchlist.sort((a, b) => a.name.localeCompare(b.name));
   $("watchlist-rows").replaceChildren(...watchlist.map((item) => watchlistRow(item)));
-  $("watchlist-count").textContent = watchlist.length === 1 ? "1 stock" : `${watchlist.length} stocks`;
+  applyFilter();
   // The CSV is for onboarding; afterwards the list is edited in place.
   $("upload").hidden = watchlist.length > 0;
   $("watchlist").hidden = watchlist.length === 0;
@@ -175,6 +175,24 @@ function watchlistRow(item) {
     );
   }
   return row;
+}
+
+// Filters only what is shown; hidden rows are still saved. Unsaved new rows always stay visible.
+function applyFilter() {
+  const raw = $("filter").value.trim();
+  const query = raw.toLowerCase();
+  const rows = [...$("watchlist-rows").rows];
+  let shown = 0;
+  for (const row of rows) {
+    const text = `${field(row, "name").value} ${field(row, "ticker").value}`.toLowerCase();
+    row.hidden = !row.classList.contains("new") && !text.includes(query);
+    if (!row.hidden) shown++;
+  }
+  const total = rows.filter((row) => !row.classList.contains("new")).length;
+  $("watchlist-count").textContent = query ? `${shown} of ${total}` : total === 1 ? "1 stock" : `${total} stocks`;
+  $("watchlist-table").hidden = rows.length > 0 && shown === 0;
+  $("no-match").hidden = !query || shown > 0;
+  $("no-match").textContent = `No stocks match “${raw}”.`;
 }
 
 function toggleRemoved(row, button, label) {
@@ -447,6 +465,19 @@ async function main() {
   $("save-watchlist").addEventListener("click", saveWatchlist);
   $("discard-watchlist").addEventListener("click", () => discardChanges().catch((err) => setWatchlistStatus(err.message, true)));
   $("watchlist-rows").addEventListener("input", updateChanges);
+  $("filter").addEventListener("input", applyFilter);
+  $("filter").addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.target.value = "";
+    applyFilter();
+  });
+  addEventListener("keydown", (event) => {
+    const typing = event.target.closest?.("input, select, textarea");
+    if (event.key === "/" && !typing && !$("watchlist").hidden) {
+      event.preventDefault();
+      $("filter").focus();
+    }
+  });
   addEventListener("beforeunload", (event) => {
     if (!$("app").hidden && pendingChanges() > 0) event.preventDefault();
   });
