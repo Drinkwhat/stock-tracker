@@ -98,9 +98,6 @@ const TRADINGVIEW_PREFIX: Record<string, string> = {
   MC: "BME",
 };
 
-// Saved TradingView chart layout the links open in.
-const TRADINGVIEW_LAYOUT = "YAFkKt0U";
-
 export function tradingViewUrl(ticker: string): string | null {
   const [, symbol, suffix] = ticker.match(/^([^.]+)(?:\.([A-Z]+))?$/) ?? [];
   if (!symbol) return null;
@@ -108,6 +105,5 @@ export function tradingViewUrl(ticker: string): string | null {
   if (prefix === undefined) return null;
   // Yahoo writes share classes with a dash (BRK-B), TradingView with a dot (BRK.B).
   const tvSymbol = symbol.replaceAll("-", ".");
-  const query = new URLSearchParams({ symbol: prefix ? `${prefix}:${tvSymbol}` : tvSymbol });
-  return `https://www.tradingview.com/chart/${TRADINGVIEW_LAYOUT}/?${query}`;
+  return `https://www.tradingview.com/symbols/${encodeURIComponent(prefix ? `${prefix}-${tvSymbol}` : tvSymbol)}/`;
 }
