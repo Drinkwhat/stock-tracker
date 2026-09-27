@@ -43,8 +43,8 @@ export function renderEmail(report: Report, kind: RunKind, currencies: Map<strin
   const headers = (withFlagDate: boolean) => [
     "Name",
     "Ticker",
-    "Price",
-    "Target",
+    "Price (EUR)",
+    "Target (EUR)",
     "Distance",
     ...(withFlagDate ? ["First flagged"] : []),
   ];

@@ -24,15 +24,40 @@ export async function fetchQuote(ticker: string): Promise<Quote> {
   return { price: meta.regularMarketPrice, currency: typeof meta.currency === "string" ? meta.currency : "" };
 }
 
-/** Returns quotes for the tickers that could be priced; failures are logged and left out. */
+// Yahoo quotes some listings in minor units (London in pence, Johannesburg in cents).
+const MINOR_UNITS: Record<string, [string, number]> = { GBp: ["GBP", 100], GBX: ["GBP", 100], ZAc: ["ZAR", 100], ILA: ["ILS", 100] };
+
+/**
+ * Returns EUR quotes for the tickers that could be priced; targets are in EUR, so prices are converted
+ * at the current Yahoo FX rate. Tickers whose price or FX rate cannot be fetched are logged and left out.
+ */
 export async function fetchQuotes(tickers: string[], fetchOne = fetchQuote): Promise<Map<string, Quote>> {
-  const quotes = new Map<string, Quote>();
+  const raw = new Map<string, Quote>();
   await mapWithConcurrency(tickers, CONCURRENCY, async (ticker) => {
     try {
-      quotes.set(ticker, await fetchOne(ticker));
+      raw.set(ticker, await fetchOne(ticker));
     } catch (err) {
       console.error("Price fetch failed", { ticker, error: String(err) });
     }
   });
+
+  const majorOf = (currency: string) => MINOR_UNITS[currency] ?? [currency, 1];
+  const toConvert = [...new Set([...raw.values()].map((q) => majorOf(q.currency)[0]))].filter((c) => c !== "EUR");
+  const rates = new Map<string, number>([["EUR", 1]]);
+  await mapWithConcurrency(toConvert, CONCURRENCY, async (currency) => {
+    try {
+      if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Unknown currency");
+      rates.set(currency, (await fetchOne(`${currency}EUR=X`)).price);
+    } catch (err) {
+      console.error("FX rate fetch failed", { currency, error: String(err) });
+    }
+  });
+
+  const quotes = new Map<string, Quote>();
+  for (const [ticker, q] of raw) {
+    const [major, divisor] = majorOf(q.currency);
+    const rate = rates.get(major);
+    if (rate !== undefined) quotes.set(ticker, { price: (q.price / divisor) * rate, currency: "EUR" });
+  }
   return quotes;
 }

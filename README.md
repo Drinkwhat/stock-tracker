@@ -22,8 +22,9 @@ Prices are checked Monday to Friday (Europe/Rome time):
 - Each reported stock shows the date it was first reported. The date is kept while the
   stock stays within ±5% and cleared when it leaves.
 - No email is sent when there is nothing to report.
-- Prices come from Yahoo Finance in the listing currency, so targets must use the same
-  currency.
+- Targets are in EUR. Prices come from Yahoo Finance in the listing currency and are
+  converted to EUR at the current Yahoo FX rate before comparing; a stock whose FX rate
+  cannot be fetched is reported as unpriced.
 
 ## Architecture
 
