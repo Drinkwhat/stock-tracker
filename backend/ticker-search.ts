@@ -84,3 +84,26 @@ export async function yahooSearch(query: string): Promise<YahooQuote[]> {
   const data = (await res.json()) as { quotes?: unknown };
   return Array.isArray(data.quotes) ? (data.quotes as YahooQuote[]) : [];
 }
+
+// Yahoo suffix → TradingView exchange prefix. US tickers have no suffix; TradingView resolves the exchange itself.
+const TRADINGVIEW_PREFIX: Record<string, string> = {
+  MI: "MIL",
+  PA: "EURONEXT",
+  AS: "EURONEXT",
+  BR: "EURONEXT",
+  LS: "EURONEXT",
+  L: "LSE",
+  DE: "XETR",
+  SW: "SIX",
+  MC: "BME",
+};
+
+export function tradingViewUrl(ticker: string): string | null {
+  const [, symbol, suffix] = ticker.match(/^([^.]+)(?:\.([A-Z]+))?$/) ?? [];
+  if (!symbol) return null;
+  const prefix = suffix ? TRADINGVIEW_PREFIX[suffix] : "";
+  if (prefix === undefined) return null;
+  // Yahoo writes share classes with a dash (BRK-B), TradingView with a dot (BRK.B).
+  const tvSymbol = symbol.replaceAll("-", ".");
+  return `https://www.tradingview.com/symbols/${encodeURIComponent(prefix ? `${prefix}-${tvSymbol}` : tvSymbol)}/`;
+}

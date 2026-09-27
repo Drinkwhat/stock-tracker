@@ -131,6 +131,7 @@ function watchlistRow(item = { name: "", ticker: "", targetPrice: "", firstFlagg
     el("td", {}, input("ticker", "Ticker", item.ticker)),
     el("td", { className: "num" }, target),
     el("td", { textContent: item.firstFlaggedAt ?? "—" }),
+    el("td", {}, item.tradingViewUrl ? el("a", { href: item.tradingViewUrl, target: "_blank", rel: "noopener", textContent: "Chart" }) : ""),
     el("td", {}, remove),
   );
   remove.addEventListener("click", () => row.remove());

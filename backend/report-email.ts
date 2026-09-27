@@ -1,4 +1,5 @@
 import { NARROW_BAND, WIDE_BAND, type Report, type ReportLine, type RunKind } from "./bands.ts";
+import { tradingViewUrl } from "./ticker-search.ts";
 
 export interface Email {
   subject: string;
@@ -8,6 +9,11 @@ export interface Email {
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+function tickerHtml(ticker: string) {
+  const url = tradingViewUrl(ticker);
+  return url ? `<a href="${escapeHtml(url)}" style="color:#1f5fbf">${escapeHtml(ticker)}</a>` : escapeHtml(ticker);
+}
 
 const pct = (band: number) => `±${Math.round(band * 100)}%`;
 const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -61,7 +67,7 @@ export function renderEmail(report: Report, kind: RunKind, currencies: Map<strin
       `<table style="border-collapse:collapse;font-size:14px">` +
       `<tr>${headers(s.withFlagDate).map((h) => `<th style="${cellStyle}">${h}</th>`).join("")}</tr>` +
       s.lines
-        .map((l) => `<tr>${cells(l, s.withFlagDate).map((c) => `<td style="${cellStyle}">${escapeHtml(c)}</td>`).join("")}</tr>`)
+        .map((l) => `<tr>${cells(l, s.withFlagDate).map((c, i) => `<td style="${cellStyle}">${i === 1 ? tickerHtml(l.ticker) : escapeHtml(c)}</td>`).join("")}</tr>`)
         .join("") +
       `</table>`,
   );

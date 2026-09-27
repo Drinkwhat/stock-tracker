@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveTicker, searchCandidates, type YahooQuote } from "../backend/ticker-search.ts";
+import { resolveTicker, searchCandidates, tradingViewUrl, type YahooQuote } from "../backend/ticker-search.ts";
 
 // Trimmed real responses from the Yahoo Finance search endpoint.
 const RESPONSES: Record<string, YahooQuote[]> = {
@@ -68,4 +68,13 @@ test("search keeps equities on any supported exchange", async () => {
     (await searchCandidates("Alten", undefined, search)).map((c) => c.symbol),
     ["ATE.PA"],
   );
+});
+
+test("maps Yahoo tickers to TradingView pages", () => {
+  const tv = "https://www.tradingview.com/symbols/";
+  assert.equal(tradingViewUrl("ENEL.MI"), `${tv}MIL-ENEL/`);
+  assert.equal(tradingViewUrl("ATE.PA"), `${tv}EURONEXT-ATE/`);
+  assert.equal(tradingViewUrl("BT-A.L"), `${tv}LSE-BT.A/`);
+  assert.equal(tradingViewUrl("BRK-B"), `${tv}BRK.B/`);
+  assert.equal(tradingViewUrl("7203.T"), null);
 });
