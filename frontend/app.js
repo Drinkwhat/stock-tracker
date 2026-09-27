@@ -107,21 +107,93 @@ async function api(path, options = {}) {
 async function loadWatchlist() {
   const { watchlist } = await api("watchlist");
   watchlist.sort((a, b) => a.name.localeCompare(b.name));
-  $("watchlist-rows").replaceChildren(
-    ...watchlist.map((item) =>
-      el(
-        "tr",
-        {},
-        el("td", { textContent: item.name }),
-        el("td", { textContent: item.ticker }),
-        el("td", { className: "num", textContent: formatPrice(item.targetPrice) }),
-        el("td", { textContent: item.firstFlaggedAt ?? "—" }),
-      ),
-    ),
-  );
-  $("watchlist-table").hidden = watchlist.length === 0;
+  $("watchlist-rows").replaceChildren(...watchlist.map(watchlistRow));
+  // The CSV is for onboarding; afterwards the list is edited in place.
+  $("upload").hidden = watchlist.length > 0;
   $("watchlist-empty").hidden = watchlist.length > 0;
   return watchlist.length;
+}
+
+function watchlistRow(item = { name: "", ticker: "", targetPrice: "", firstFlaggedAt: null }) {
+  const input = (field, label, value) => {
+    const node = el("input", { type: "text", value: String(value), autocomplete: "off", spellcheck: false });
+    node.dataset.field = field;
+    node.setAttribute("aria-label", label);
+    return node;
+  };
+  const target = input("targetPrice", "Target (EUR)", item.targetPrice);
+  target.inputMode = "decimal";
+  const remove = el("button", { type: "button", className: "secondary", textContent: "Remove" });
+  const row = el(
+    "tr",
+    {},
+    el("td", {}, input("name", "Name", item.name)),
+    el("td", {}, input("ticker", "Ticker", item.ticker)),
+    el("td", { className: "num" }, target),
+    el("td", { textContent: item.firstFlaggedAt ?? "—" }),
+    el("td", {}, remove),
+  );
+  remove.addEventListener("click", () => row.remove());
+  // New stocks: look up the ticker when the name is entered.
+  if (!item.ticker) {
+    row.querySelector('[data-field="name"]').addEventListener("change", (event) =>
+      suggestTickers(event.target.value, row.querySelector('[data-field="ticker"]')).catch((err) => setStatus(err.message, true)),
+    );
+  }
+  return row;
+}
+
+let datalistCount = 0;
+
+async function suggestTickers(name, tickerInput) {
+  if (!name.trim()) return;
+  setStatus(`Looking up ${name}…`);
+  const { candidates } = await api(`watchlist/search?${new URLSearchParams({ q: name.trim() })}`);
+  tickerInput.nextElementSibling?.remove();
+  if (candidates.length === 0) return setStatus(`No ticker found for ${name}, enter it by hand.`, true);
+
+  const list = el("datalist", { id: `search-${datalistCount++}` }, ...candidates.map((c) => el("option", { value: c.symbol, label: `${c.name} (${c.exchange})` })));
+  tickerInput.after(list);
+  tickerInput.setAttribute("list", list.id);
+  if (!tickerInput.value.trim()) tickerInput.value = candidates[0].symbol;
+  setStatus(
+    candidates.length === 1
+      ? `Found ${candidates[0].symbol} (${candidates[0].name}, ${candidates[0].exchange}).`
+      : `${candidates.length} matches for ${name}: check the ticker (click the field to see them).`,
+  );
+}
+
+function addStock() {
+  const row = watchlistRow();
+  $("watchlist-rows").append(row);
+  row.querySelector("input").focus();
+}
+
+async function saveWatchlist() {
+  const rows = [...$("watchlist-rows").rows];
+  const field = (row, name) => row.querySelector(`[data-field="${name}"]`);
+  rows.forEach((row) => row.querySelectorAll("input").forEach((i) => i.classList.remove("invalid")));
+
+  const items = rows.map((row) => ({
+    name: field(row, "name").value,
+    ticker: field(row, "ticker").value,
+    // Accept Italian decimals ("16,3"); anything unparseable is rejected by the server.
+    targetPrice: Number(field(row, "targetPrice").value.trim().replace(",", ".")) || null,
+  }));
+  if (items.length === 0 && !confirm("Remove all stocks from your watchlist?")) return;
+
+  try {
+    const { saved } = await api("watchlist", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    await loadWatchlist();
+    setStatus(`Watchlist saved: ${saved} stocks.`);
+  } catch (err) {
+    for (const detail of err.body?.details ?? []) field(rows[detail.index], detail.field)?.classList.add("invalid");
+    setStatus(err.body?.details ? "Some fields are invalid or duplicated (highlighted in red)." : err.message, true);
+  }
 }
 
 const formatPrice = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 4 });
@@ -246,6 +318,9 @@ async function main() {
     $("file").value = "";
   });
   $("save").addEventListener("click", save);
+  $("add-stock").addEventListener("click", addStock);
+  $("save-watchlist").addEventListener("click", saveWatchlist);
+  $("discard-watchlist").addEventListener("click", () => loadWatchlist().then(() => setStatus("")));
   $("file").addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) previewFile(file).catch((err) => setStatus(err.message, true));

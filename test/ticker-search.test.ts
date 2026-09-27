@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveTicker, type YahooQuote } from "../backend/ticker-search.ts";
+import { resolveTicker, searchCandidates, type YahooQuote } from "../backend/ticker-search.ts";
 
 // Trimmed real responses from the Yahoo Finance search endpoint.
 const RESPONSES: Record<string, YahooQuote[]> = {
@@ -61,4 +61,11 @@ test("returns unsupported_country without searching", async () => {
   });
   assert.equal(result.status, "unsupported_country");
   assert.equal(called, false);
+});
+
+test("search keeps equities on any supported exchange", async () => {
+  assert.deepEqual(
+    (await searchCandidates("Alten", undefined, search)).map((c) => c.symbol),
+    ["ATE.PA"],
+  );
 });

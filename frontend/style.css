@@ -146,6 +146,23 @@ td input {
   text-transform: uppercase;
 }
 
+td input[data-field="name"] {
+  width: 16em;
+  text-transform: none;
+}
+
+td input[data-field="targetPrice"] {
+  text-align: right;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 td input.invalid {
   border-color: var(--error);
   outline: 1px solid var(--error);

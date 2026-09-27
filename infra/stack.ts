@@ -85,6 +85,8 @@ export class StockTrackerStack extends Stack {
     // Ticker searches run inside the request, bounded by the 30 s API Gateway timeout.
     const previewFn = fn("PreviewFn", "preview.ts", Duration.seconds(28));
 
+    const searchFn = fn("SearchFn", "search.ts", Duration.seconds(10));
+
     const saveFn = fn("SaveFn", "save.ts", Duration.seconds(28));
     table.grantReadWriteData(saveFn);
 
@@ -189,6 +191,13 @@ export class StockTrackerStack extends Stack {
       path: "/watchlist/preview",
       methods: [apigw.HttpMethod.POST],
       integration: new HttpLambdaIntegration("PreviewIntegration", previewFn),
+      authorizer,
+    });
+
+    api.addRoutes({
+      path: "/watchlist/search",
+      methods: [apigw.HttpMethod.GET],
+      integration: new HttpLambdaIntegration("SearchIntegration", searchFn),
       authorizer,
     });
 

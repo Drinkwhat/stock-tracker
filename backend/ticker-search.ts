@@ -47,14 +47,25 @@ function stripCorporateSuffix(name: string): string {
   return current;
 }
 
+const SUPPORTED_EXCHANGES = [...new Set(Object.values(EXCHANGES_BY_COUNTRY).flat())];
+
+/** Equities matching the query, limited to the given exchanges (default: every supported country). */
+export async function searchCandidates(
+  query: string,
+  exchanges = SUPPORTED_EXCHANGES,
+  search: SearchFn = yahooSearch,
+): Promise<Candidate[]> {
+  return (await search(query))
+    .filter((q) => q.symbol && q.quoteType === "EQUITY" && exchanges.includes(q.exchange ?? ""))
+    .map((q) => ({ symbol: q.symbol!, name: q.longname ?? q.shortname ?? q.symbol!, exchange: q.exchange! }));
+}
+
 export async function resolveTicker(name: string, country: string, search: SearchFn = yahooSearch): Promise<Resolution> {
   const exchanges = EXCHANGES_BY_COUNTRY[country.trim().toLowerCase()];
   if (!exchanges) return { status: "unsupported_country", candidates: [] };
 
   for (const query of new Set([name, stripCorporateSuffix(name)])) {
-    const candidates = (await search(query))
-      .filter((q) => q.symbol && q.quoteType === "EQUITY" && exchanges.includes(q.exchange ?? ""))
-      .map((q) => ({ symbol: q.symbol!, name: q.longname ?? q.shortname ?? q.symbol!, exchange: q.exchange! }));
+    const candidates = await searchCandidates(query, exchanges, search);
     if (candidates.length > 0) {
       return { status: candidates.length === 1 ? "resolved" : "ambiguous", ticker: candidates[0].symbol, candidates };
     }
