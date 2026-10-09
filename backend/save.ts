@@ -2,7 +2,7 @@ import { mapWithConcurrency } from "./concurrency.ts";
 import { batchWrite, queryUserItems, type StoredItem } from "./db.ts";
 import { bodyText, json, userIdOf, type AuthedEvent } from "./http.ts";
 import { fetchQuote } from "./prices.ts";
-import { MAX_NAME_LENGTH, MAX_ROWS, TICKER_PATTERN } from "./watchlist-csv.ts";
+import { MAX_ITEMS, MAX_NAME_LENGTH, TICKER_PATTERN } from "./watchlist-csv.ts";
 
 export interface WatchlistItem {
   name: string;
@@ -19,7 +19,7 @@ interface ItemError {
 export function validateItems(body: unknown): { items: WatchlistItem[] } | { error: string; details?: ItemError[] } {
   const rawItems = (body as { items?: unknown } | null)?.items;
   if (!Array.isArray(rawItems)) return { error: "Body must be an object with an items array" };
-  if (rawItems.length > MAX_ROWS) return { error: `Too many items (max ${MAX_ROWS})` };
+  if (rawItems.length > MAX_ITEMS) return { error: `Too many items (max ${MAX_ITEMS})` };
 
   const items: WatchlistItem[] = [];
   const errors: ItemError[] = [];
@@ -84,9 +84,12 @@ export async function handler(event: AuthedEvent) {
 
 // US tickers carry no exchange suffix; store Yahoo's exchange code so TradingView links open the right listing.
 // A failed lookup only means no link, so it never blocks the save.
+// ponytail: stops looking up after 15 s so big imports fit the 28 s timeout; the rest get no link until a later save.
 async function addUsExchanges(puts: StoredItem[]) {
   const missing = puts.filter((item) => !item.ticker.includes(".") && item.exchange === undefined);
+  const deadline = Date.now() + 15_000;
   await mapWithConcurrency(missing, 5, async (item) => {
+    if (Date.now() > deadline) return;
     try {
       const { exchange } = await fetchQuote(item.ticker);
       if (exchange) item.exchange = exchange;

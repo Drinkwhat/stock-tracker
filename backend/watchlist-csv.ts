@@ -21,8 +21,10 @@ export interface ParseResult {
 
 export class CsvError extends Error {}
 
-// Every row may need a ticker search, which must finish within the 30 s API Gateway limit.
+// Every row may need a ticker search, which must finish within the 30 s API Gateway limit,
+// so one preview request takes at most MAX_ROWS rows; the frontend splits bigger files.
 export const MAX_ROWS = 200;
+export const MAX_ITEMS = 2000;
 export const MAX_NAME_LENGTH = 200;
 export const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9.\-=^]{0,14}$/;
 

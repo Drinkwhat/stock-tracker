@@ -409,14 +409,31 @@ const EXCLUSION_LABELS = {
   invalid_ticker: "invalid ticker",
 };
 
+// The server previews at most PREVIEW_CHUNK rows per request, so big files go up in slices.
+const PREVIEW_CHUNK = 200;
+
+async function previewCsv(text) {
+  const [header, ...lines] = text.split(/\r?\n/);
+  const rows = [];
+  const excluded = [];
+  for (let start = 0; start === 0 || start < lines.length; start += PREVIEW_CHUNK) {
+    setStatus(`Looking up tickers… ${Math.min(start, lines.length)}/${lines.length} lines`);
+    const part = await api("watchlist/preview", {
+      method: "POST",
+      headers: { "content-type": "text/csv" },
+      body: [header, ...lines.slice(start, start + PREVIEW_CHUNK)].join("\n"),
+    });
+    // Line numbers are relative to the slice; shift them back to the original file.
+    rows.push(...part.rows.map((r) => ({ ...r, line: r.line + start })));
+    excluded.push(...part.excluded.map((e) => ({ ...e, line: e.line + start })));
+  }
+  return { rows, excluded };
+}
+
 async function previewFile(file) {
   setStatus(`Looking up tickers for ${file.name}…`);
   $("preview").hidden = true;
-  const { rows, excluded } = await api("watchlist/preview", {
-    method: "POST",
-    headers: { "content-type": "text/csv" },
-    body: await file.text(),
-  });
+  const { rows, excluded } = await previewCsv(await file.text());
   previewRows = rows;
 
   $("preview-rows").replaceChildren(...rows.map(previewRow));
