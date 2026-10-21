@@ -45,11 +45,26 @@ const MINOR_UNITS: Record<string, [string, number]> = { GBp: ["GBP", 100], GBX: 
  * Returns EUR quotes for the tickers that could be priced; targets are in EUR, so prices are converted
  * at the current Yahoo FX rate. Tickers whose price or FX rate cannot be fetched are logged and left out.
  */
-export async function fetchQuotes(tickers: string[], fetchOne = fetchQuote): Promise<Map<string, Quote>> {
+export async function fetchQuotes(
+  tickers: string[],
+  fetchOne = fetchQuote,
+  retryDelayMs = 1000,
+): Promise<Map<string, Quote>> {
+  // Yahoo answers 429 when called too fast; wait and try again instead of dropping the ticker.
+  const fetchWithRetry = async (ticker: string): Promise<Quote> => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await fetchOne(ticker);
+      } catch (err) {
+        if (attempt >= 3 || !String(err).includes("status 429")) throw err;
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
+      }
+    }
+  };
   const raw = new Map<string, Quote>();
   await mapWithConcurrency(tickers, CONCURRENCY, async (ticker) => {
     try {
-      raw.set(ticker, await fetchOne(ticker));
+      raw.set(ticker, await fetchWithRetry(ticker));
     } catch (err) {
       console.error("Price fetch failed", { ticker, error: String(err) });
     }
@@ -61,7 +76,7 @@ export async function fetchQuotes(tickers: string[], fetchOne = fetchQuote): Pro
   await mapWithConcurrency(toConvert, CONCURRENCY, async (currency) => {
     try {
       if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Unknown currency");
-      rates.set(currency, (await fetchOne(`${currency}EUR=X`)).price);
+      rates.set(currency, (await fetchWithRetry(`${currency}EUR=X`)).price);
     } catch (err) {
       console.error("FX rate fetch failed", { currency, error: String(err) });
     }

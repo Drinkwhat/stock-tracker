@@ -38,3 +38,17 @@ test("converts prices to EUR and leaves out tickers without an FX rate", async (
     ],
   );
 });
+
+test("retries a ticker when Yahoo answers 429", async () => {
+  let calls = 0;
+  const quotes = await fetchQuotes(
+    ["ATE.PA"],
+    async () => {
+      if (++calls < 3) throw new Error("Yahoo chart request for ATE.PA failed with status 429");
+      return { price: 76.25, currency: "EUR" };
+    },
+    0,
+  );
+  assert.equal(calls, 3);
+  assert.equal(quotes.get("ATE.PA")?.price, 76.25);
+});

@@ -211,7 +211,7 @@ export class StockTrackerStack extends Stack {
       identity: ses.Identity.email(senderEmail),
     });
 
-    const alertsFn = fn("AlertsFn", "alerts.ts", Duration.seconds(60));
+    const alertsFn = fn("AlertsFn", "alerts.ts", Duration.minutes(10));
     alertsFn.addEnvironment("SENDER_EMAIL", senderEmail);
     alertsFn.addEnvironment("USER_POOL_ID", userPool.userPoolId);
     // A retry would email users who were already notified in the failed run.
